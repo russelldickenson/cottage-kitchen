@@ -1020,7 +1020,6 @@ public class GameView extends View {
 
     private void drawTile(Canvas c, Tile t, float extra) {
         float x = cx(t), y = cy(t);
-        boolean special = Art.isSpecial(t.type);
         boolean fx = t == fxTile && phase == Phase.CLEAR;
         float rot = 0, mult = 1f, ox = 0, oy = 0;
         if (fx) {
@@ -1041,29 +1040,6 @@ public class GameView extends View {
                 case Art.TRACTOR:
                     if (k > 0.15f) return; // the tractor itself is driving across the board
                     mult = 1f + k * 2f;
-                    break;
-            }
-        } else if (special && !t.dying) {
-            float ph = time * 5 + t.r * 1.7f + t.c * 0.9f;
-            float pulse = 0.5f + 0.5f * (float) Math.sin(time * 4 + t.c);
-            int glow = 0xFFFFE066;
-            if (t.type == Art.TRACTOR) glow = Color.HSVToColor(new float[]{(time * 120 + t.c * 40) % 360, 0.55f, 1f});
-            else if (t.type == Art.TNT) glow = 0xFFFF8A4A;
-            else if (t.type == Art.SCARECROW) glow = 0xFFFFF0A0;
-            gfx.circle(c, x, y, cell * (0.5f + 0.07f * pulse) * t.scale, Gfx.alpha(glow, 0.3f + 0.2f * pulse));
-            switch (t.type) {
-                case Art.SCARECROW:
-                    rot = (float) Math.sin(ph) * 6f;
-                    break;
-                case Art.TNT:
-                    rot = (float) Math.sin(time * 14) * 3f;
-                    ox = (float) Math.sin(time * 31) * cell * 0.01f;
-                    break;
-                case Art.GOLDEN_EGG:
-                    mult = 1f + 0.05f * (float) Math.sin(time * 6);
-                    break;
-                case Art.TRACTOR:
-                    oy = -Math.abs((float) Math.sin(time * 5)) * cell * 0.03f;
                     break;
             }
         }

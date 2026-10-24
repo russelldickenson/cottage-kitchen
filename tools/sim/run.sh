@@ -1,0 +1,9 @@
+#!/bin/sh
+# Compiles the game's pure logic with the simulator and prints per-level win rates.
+set -e
+cd "$(dirname "$0")/../.."
+OUT=$(mktemp -d)
+SRC=app/src/main/java/com/farmharvest/game
+javac -d "$OUT" $SRC/Art.java $SRC/Board.java $SRC/Level.java $SRC/Tile.java tools/sim/R.java tools/sim/Sim.java
+java -cp "$OUT" com.farmharvest.game.Sim "${1:-100}" $2
+rm -rf "$OUT"
