@@ -231,6 +231,16 @@ final class Gfx {
         text(c, "$", cx, cy + 0.36f * s, 0.34f * s, 0xFFF2D58A, OUT, Paint.Align.CENTER);
     }
 
+    /** Glowing beam with a bright core. */
+    void beam(Canvas c, float x1, float y1, float x2, float y2, float w, int color) {
+        line.setColor(color);
+        line.setStrokeWidth(w);
+        c.drawLine(x1, y1, x2, y2, line);
+        line.setColor(0xCCFFFFFF);
+        line.setStrokeWidth(w * 0.35f);
+        c.drawLine(x1, y1, x2, y2, line);
+    }
+
     void backArrow(Canvas c, float cx, float cy, float r) {
         line.setColor(Color.WHITE);
         line.setStrokeWidth(r * 0.3f);

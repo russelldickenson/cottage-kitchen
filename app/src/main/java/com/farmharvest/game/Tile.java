@@ -7,7 +7,8 @@ final class Tile {
     float x, y, vy;
     float scale = 1f;
     float squash;
-    boolean dying;
+    boolean dying, popped;
+    float dyDelay;
 
     Tile(int type, int r, int c) {
         this.type = type;

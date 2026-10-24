@@ -16,9 +16,13 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowInsets;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 
 /** Renders every screen (title, level select, play) and drives the match-3 state machine. */
 public class GameView extends View {
@@ -74,6 +78,10 @@ public class GameView extends View {
     private final List<Pop> pops = new ArrayList<>();
     private final List<Tile> dying = new ArrayList<>();
     private final List<Flyer> bagFlyers = new ArrayList<>();
+    private final List<Tile> spawnTiles = new ArrayList<>();
+    private final List<Integer> spawnTypes = new ArrayList<>();
+    private Tile fxTile;
+    private float clearDuration = CLEAR_TIME;
     private static final float BAG_PAUSE = 1f, BAG_POP = 0.35f, BAG_FLY = 0.5f;
     private float bagT, bagBump, bagEndT;
     private int bagTotal;
@@ -358,7 +366,11 @@ public class GameView extends View {
             case SWAP:
                 if (moveTiles(dt, false)) {
                     List<Board.Run> runs = board.findRuns();
-                    if (runs.isEmpty()) {
+                    if (Art.isSpecial(swapA.type) || Art.isSpecial(swapB.type)) {
+                        movesLeft--;
+                        combo = 1;
+                        activateSpecial(swapA, swapB);
+                    } else if (runs.isEmpty()) {
                         board.swap(swapA.r, swapA.c, swapB.r, swapB.c);
                         phase = Phase.SWAPBACK;
                     } else {
@@ -376,10 +388,18 @@ public class GameView extends View {
                 break;
             case CLEAR:
                 clearTimer += dt;
-                float p = Math.min(1f, clearTimer / CLEAR_TIME);
-                float s = p < 0.3f ? 1f + 0.3f * (p / 0.3f) : 1.3f * (1f - (p - 0.3f) / 0.7f);
-                for (Tile t : dying) t.scale = Math.max(0f, s);
-                if (clearTimer >= CLEAR_TIME) finishClear();
+                for (Tile t : dying) {
+                    float p = (clearTimer - t.dyDelay) / CLEAR_TIME;
+                    if (p < 0) continue;
+                    if (!t.popped) {
+                        t.popped = true;
+                        sparkle(cx(t), cy(t));
+                    }
+                    p = Math.min(1f, p);
+                    float s = p < 0.3f ? 1f + 0.3f * (p / 0.3f) : 1.3f * (1f - (p - 0.3f) / 0.7f);
+                    t.scale = Math.max(0f, s);
+                }
+                if (clearTimer >= clearDuration) finishClear();
                 break;
             case FALL:
                 if (moveTiles(dt, true)) {
@@ -444,10 +464,41 @@ public class GameView extends View {
         return settled;
     }
 
+    private void addSpawn(Tile t, int type) {
+        if (spawnTiles.contains(t)) return;
+        spawnTiles.add(t);
+        spawnTypes.add(type);
+    }
+
     private void startClear(List<Board.Run> runs) {
         phase = Phase.CLEAR;
         clearTimer = 0;
+        clearDuration = CLEAR_TIME;
+        fxTile = null;
         dying.clear();
+        spawnTiles.clear();
+        spawnTypes.clear();
+        // 5+ in a row makes a colour-clearer; a T or L (a horizontal and a vertical run sharing a tile) makes a bomb
+        for (Board.Run run : runs) {
+            if (run.tiles.size() < 5) continue;
+            Tile at = run.tiles.contains(swapA) ? swapA : run.tiles.contains(swapB) ? swapB : run.tiles.get(run.tiles.size() / 2);
+            addSpawn(at, rnd.nextBoolean() ? Art.GOLDEN_EGG : Art.TRACTOR);
+        }
+        for (Board.Run h : runs) {
+            if (!h.horizontal) continue;
+            for (Board.Run v : runs) {
+                if (v.horizontal || v.type != h.type) continue;
+                for (Tile t : h.tiles) {
+                    if (v.tiles.contains(t)) {
+                        addSpawn(t, rnd.nextBoolean() ? Art.TNT : Art.SCARECROW);
+                        break;
+                    }
+                }
+            }
+        }
+        swapA = swapB = null;
+
+        Set<Tile> seen = new HashSet<>();
         boolean first = true;
         for (Board.Run run : runs) {
             int n = run.tiles.size();
@@ -465,38 +516,126 @@ public class GameView extends View {
                 f.delay = rnd.nextFloat() * 0.12f;
                 f.value = i == n - 1 ? gain - share * (n - 1) : share;
                 flyers.add(f);
-                if (!t.dying) {
-                    t.dying = true;
-                    dying.add(t);
+                if (seen.add(t)) {
                     if (need[t.type] > 0) need[t.type]--;
-                    sparkle(cx(t), cy(t));
+                    if (!spawnTiles.contains(t)) {
+                        t.dying = true;
+                        t.dyDelay = 0;
+                        dying.add(t);
+                    }
                 }
             }
-            Pop pop = new Pop();
-            pop.x = ax / n;
-            pop.y = ay / n;
-            pop.text = "+" + gain;
-            pop.size = cell * 0.55f;
-            pop.life = pop.max = 0.9f;
-            pop.color = Color.WHITE;
-            pops.add(pop);
-            if (first && combo > 1) {
-                Pop cp = new Pop();
-                cp.x = W / 2;
-                cp.y = by + cell * 1.2f;
-                cp.text = "Combo x" + combo + "!";
-                cp.size = cell * 0.8f;
-                cp.life = cp.max = 1.1f;
-                cp.color = 0xFFFFD43B;
-                pops.add(cp);
-            }
+            addPop("+" + gain, ax / n, ay / n, cell * 0.55f, 0.9f, Color.WHITE);
+            if (first && combo > 1) addPop("Combo x" + combo + "!", W / 2, by + cell * 1.2f, cell * 0.8f, 1.1f, 0xFFFFD43B);
             first = false;
         }
+        if (!spawnTiles.isEmpty()) addPop(spawnTypes.get(0) == Art.GOLDEN_EGG || spawnTypes.get(0) == Art.TRACTOR ? "Super Harvest!" : "Big Bang!",
+                W / 2, by + cell * 2.4f, cell * 0.85f, 1.2f, 0xFFFF9B26);
+    }
+
+    private void addPop(String text, float x, float y, float size, float life, int color) {
+        Pop p = new Pop();
+        p.x = x;
+        p.y = y;
+        p.text = text;
+        float tw = gfx.width(text, size);
+        p.size = tw > W * 0.88f ? size * W * 0.88f / tw : size;
+        p.life = p.max = life;
+        p.color = color;
+        pops.add(p);
+    }
+
+    /** One of the swapped tiles is a power-up: work out what it takes with it. */
+    private void activateSpecial(Tile a, Tile b) {
+        boolean ac = Art.isColor(a.type), bc = Art.isColor(b.type);
+        boolean as = Art.isSpecial(a.type), bs = Art.isSpecial(b.type);
+        Set<Tile> set = new LinkedHashSet<>();
+        Tile act;
+        if ((ac || bc) && as && bs) {
+            act = ac ? a : b;
+            for (Tile[] row : board.g) for (Tile t : row) if (t != null) set.add(t);
+        } else if (ac || bc) {
+            act = ac ? a : b;
+            Tile other = ac ? b : a;
+            for (Tile[] row : board.g) for (Tile t : row) if (t != null && t.type == other.type) set.add(t);
+            set.add(act);
+        } else {
+            act = Art.isBomb(a.type) ? a : b;
+            ArrayDeque<Tile> q = new ArrayDeque<>();
+            for (Tile t : new Tile[]{a, b}) {
+                if (Art.isBomb(t.type) && set.add(t)) q.add(t);
+            }
+            while (!q.isEmpty()) {
+                Tile t = q.poll();
+                for (int dr = -1; dr <= 1; dr++) {
+                    for (int dc = -1; dc <= 1; dc++) {
+                        int nr = t.r + dr, nc = t.c + dc;
+                        if (nr < 0 || nc < 0 || nr >= ROWS || nc >= COLS) continue;
+                        Tile n = board.g[nr][nc];
+                        if (n != null && set.add(n) && Art.isBomb(n.type)) q.add(n);
+                    }
+                }
+            }
+        }
+        beginSpecialClear(set, act);
+    }
+
+    private void beginSpecialClear(Set<Tile> set, final Tile act) {
+        phase = Phase.CLEAR;
+        clearTimer = 0;
+        dying.clear();
+        spawnTiles.clear();
+        spawnTypes.clear();
+        fxTile = act;
+        swapA = swapB = null;
+        List<Tile> list = new ArrayList<>(set);
+        list.sort((x, y) -> Integer.compare(Math.abs(x.r - act.r) + Math.abs(x.c - act.c), Math.abs(y.r - act.r) + Math.abs(y.c - act.c)));
+        int gain = list.size() * 12 * combo;
+        coins += gain;
+        int share = gain / list.size();
+        float maxDelay = 0;
+        float ax = 0, ay = 0;
+        for (int i = 0; i < list.size(); i++) {
+            Tile t = list.get(i);
+            float d;
+            if (act.type == Art.GOLDEN_EGG) d = 0.03f * i;
+            else if (act.type == Art.TRACTOR) d = 0.1f + 0.08f * t.c;
+            else d = 0.07f * Math.max(Math.abs(t.r - act.r), Math.abs(t.c - act.c));
+            t.dyDelay = d;
+            t.dying = true;
+            dying.add(t);
+            if (t.type < Art.CROPS && need[t.type] > 0) need[t.type]--;
+            maxDelay = Math.max(maxDelay, d);
+            ax += cx(t);
+            ay += cy(t);
+            Flyer f = new Flyer();
+            f.sx = cx(t);
+            f.sy = cy(t);
+            f.delay = d + rnd.nextFloat() * 0.1f;
+            f.value = i == list.size() - 1 ? gain - share * (list.size() - 1) : share;
+            flyers.add(f);
+        }
+        act.dyDelay = maxDelay;
+        clearDuration = CLEAR_TIME + maxDelay;
+        String name = act.type == Art.GOLDEN_EGG ? "Golden Harvest!" : act.type == Art.TRACTOR ? "Rainbow Roundup!"
+                : act.type == Art.TNT ? "Boom!" : "Scarecrow Sweep!";
+        addPop(name, W / 2, by + cell * 1.2f, cell * 0.85f, 1.3f, 0xFFFFD43B);
+        addPop("+" + gain, ax / list.size(), ay / list.size(), cell * 0.65f, 1.0f, Color.WHITE);
     }
 
     private void finishClear() {
         for (Tile t : dying) board.g[t.r][t.c] = null;
         dying.clear();
+        fxTile = null;
+        for (int i = 0; i < spawnTiles.size(); i++) {
+            Tile t = spawnTiles.get(i);
+            t.type = spawnTypes.get(i);
+            t.scale = 0f;
+            sparkle(cx(t), cy(t));
+            sparkle(cx(t), cy(t));
+        }
+        spawnTiles.clear();
+        spawnTypes.clear();
         board.collapse();
         phase = Phase.FALL;
     }
@@ -796,8 +935,12 @@ public class GameView extends View {
                     if (t == selected) extra = 1f + 0.07f * (float) Math.sin(time * 12);
                     else if (hint != null && ((t.r == hint[0] && t.c == hint[1]) || (t.r == hint[2] && t.c == hint[3])))
                         extra = 1f + 0.1f * (float) Math.sin(time * 8);
-                    drawTile(c, t, extra);
+                    if (t != fxTile) drawTile(c, t, extra);
                 }
+            }
+            if (fxTile != null && phase == Phase.CLEAR) {
+                drawFx(c);
+                drawTile(c, fxTile, 1f);
             }
             c.restore();
         }
@@ -877,14 +1020,109 @@ public class GameView extends View {
 
     private void drawTile(Canvas c, Tile t, float extra) {
         float x = cx(t), y = cy(t);
-        float size = cell * 0.92f * t.scale * extra;
+        boolean special = Art.isSpecial(t.type);
+        boolean fx = t == fxTile && phase == Phase.CLEAR;
+        float rot = 0, mult = 1f, ox = 0, oy = 0;
+        if (fx) {
+            float k = clearTimer;
+            switch (t.type) {
+                case Art.SCARECROW:
+                    rot = k * 1000f;
+                    mult = 1.5f;
+                    break;
+                case Art.TNT:
+                    mult = 1f + 0.6f * Math.min(1f, k * 4f);
+                    ox = (float) Math.sin(k * 70) * cell * 0.03f;
+                    break;
+                case Art.GOLDEN_EGG:
+                    mult = 1.4f + 0.1f * (float) Math.sin(k * 20);
+                    gfx.circle(c, x, y, cell * (0.7f + 0.2f * (float) Math.sin(k * 18)), 0x66FFE066);
+                    break;
+                case Art.TRACTOR:
+                    if (k > 0.15f) return; // the tractor itself is driving across the board
+                    mult = 1f + k * 2f;
+                    break;
+            }
+        } else if (special && !t.dying) {
+            float ph = time * 5 + t.r * 1.7f + t.c * 0.9f;
+            float pulse = 0.5f + 0.5f * (float) Math.sin(time * 4 + t.c);
+            int glow = 0xFFFFE066;
+            if (t.type == Art.TRACTOR) glow = Color.HSVToColor(new float[]{(time * 120 + t.c * 40) % 360, 0.55f, 1f});
+            else if (t.type == Art.TNT) glow = 0xFFFF8A4A;
+            else if (t.type == Art.SCARECROW) glow = 0xFFFFF0A0;
+            gfx.circle(c, x, y, cell * (0.5f + 0.07f * pulse) * t.scale, Gfx.alpha(glow, 0.3f + 0.2f * pulse));
+            switch (t.type) {
+                case Art.SCARECROW:
+                    rot = (float) Math.sin(ph) * 6f;
+                    break;
+                case Art.TNT:
+                    rot = (float) Math.sin(time * 14) * 3f;
+                    ox = (float) Math.sin(time * 31) * cell * 0.01f;
+                    break;
+                case Art.GOLDEN_EGG:
+                    mult = 1f + 0.05f * (float) Math.sin(time * 6);
+                    break;
+                case Art.TRACTOR:
+                    oy = -Math.abs((float) Math.sin(time * 5)) * cell * 0.03f;
+                    break;
+            }
+        }
+        float size = cell * 0.92f * t.scale * extra * mult;
         float w = size * (1f + 0.12f * t.squash), h = size * (1f - 0.18f * t.squash);
-        float bottom = y + size / 2;
-        gfx.ellipse(c, x, y + cell * 0.38f, cell * 0.3f * t.scale, cell * 0.06f * t.scale, 0x26000000);
+        float bottom = y + oy + size / 2;
+        if (!fx) gfx.ellipse(c, x, y + cell * 0.38f, cell * 0.3f * t.scale, cell * 0.06f * t.scale, 0x26000000);
         Bitmap b = art[t.type];
         src.set(0, 0, b.getWidth(), b.getHeight());
-        dst.set(x - w / 2, bottom - h, x + w / 2, bottom);
+        dst.set(x + ox - w / 2, bottom - h, x + ox + w / 2, bottom);
+        c.save();
+        if (rot != 0) c.rotate(rot, x + ox, y + oy);
         c.drawBitmap(b, src, dst, bmp);
+        c.restore();
+    }
+
+    /** Effects around the power-up that is currently being played. */
+    private void drawFx(Canvas c) {
+        float x = cx(fxTile), y = cy(fxTile), k = clearTimer;
+        switch (fxTile.type) {
+            case Art.GOLDEN_EGG:
+                for (Tile t : dying) {
+                    if (t == fxTile) continue;
+                    float a = 1f - (k - t.dyDelay) / 0.3f;
+                    if (k >= t.dyDelay - 0.05f && a > 0f)
+                        gfx.beam(c, x, y, cx(t), cy(t), cell * 0.14f * Math.min(1f, a), Gfx.alpha(0xFFFFD43B, Math.min(1f, a)));
+                }
+                gfx.circle(c, x, y, cell * (0.6f + k * 3f), Gfx.alpha(0xFFFFF3B0, Math.max(0f, 0.45f - k)));
+                break;
+            case Art.TNT: {
+                float a = Math.max(0f, 1f - k * 2.5f);
+                float rad = cell * (0.4f + k * 9f);
+                gfx.circle(c, x, y, rad * 0.85f, Gfx.alpha(0xFFFFE08A, a * 0.55f));
+                gfx.circleLine(c, x, y, rad, cell * 0.22f * a, Gfx.alpha(0xFFFF7A00, a));
+                break;
+            }
+            case Art.SCARECROW: {
+                float a = Math.max(0f, 1f - k * 2f);
+                for (int i = 0; i < 10; i++) {
+                    double ang = k * 14 + i * Math.PI / 5;
+                    float rr = cell * (0.5f + k * 5f);
+                    gfx.star(c, x + (float) Math.cos(ang) * rr, y + (float) Math.sin(ang) * rr, cell * 0.14f, Gfx.alpha(0xFFFFD25A, a), 0);
+                }
+                break;
+            }
+            case Art.TRACTOR: {
+                float tx = bx - cell * 0.5f + (k / 0.08f) * cell;
+                if (tx < bx + cell * (COLS + 1)) {
+                    float size = cell * 1.5f;
+                    Bitmap b = art[Art.TRACTOR];
+                    src.set(0, 0, b.getWidth(), b.getHeight());
+                    float bob = (float) Math.sin(k * 40) * cell * 0.02f;
+                    dst.set(tx - size / 2, y + cell * 0.45f - size + bob, tx + size / 2, y + cell * 0.45f + bob);
+                    gfx.ellipse(c, tx, y + cell * 0.45f, size * 0.4f, cell * 0.07f, 0x30000000);
+                    c.drawBitmap(b, src, dst, bmp);
+                }
+                break;
+            }
+        }
     }
 
     private void drawEnd(Canvas c) {

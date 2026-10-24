@@ -20,9 +20,9 @@ final class Level {
 
     static Level get(int index) {
         int nk = 4 + Math.min(index / 4, 2);
-        int offset = (index * 3) % Art.COUNT;
+        int offset = (index * 3) % Art.CROPS;
         int[] kinds = new int[nk];
-        for (int j = 0; j < nk; j++) kinds[j] = (offset + j) % Art.COUNT;
+        for (int j = 0; j < nk; j++) kinds[j] = (offset + j) % Art.CROPS;
 
         int ng = Math.min(2 + index / 5, 4);
         int[] gk = new int[ng];

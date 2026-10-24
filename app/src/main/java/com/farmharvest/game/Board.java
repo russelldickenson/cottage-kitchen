@@ -8,10 +8,12 @@ import java.util.Random;
 final class Board {
     static final class Run {
         final int type;
+        final boolean horizontal;
         final List<Tile> tiles = new ArrayList<>();
 
-        Run(int type) {
+        Run(int type, boolean horizontal) {
             this.type = type;
+            this.horizontal = horizontal;
         }
     }
 
@@ -36,7 +38,7 @@ final class Board {
     int typeAt(int r, int c) {
         if (r < 0 || c < 0 || r >= rows || c >= cols) return -1;
         Tile t = g[r][c];
-        return t == null ? -1 : t.type;
+        return t == null || Art.isSpecial(t.type) ? -1 : t.type;
     }
 
     private boolean makes3(int r, int c, int t) {
@@ -68,7 +70,7 @@ final class Board {
                     do {
                         t = pick();
                     } while (makes3(r, c, t));
-                    g[r][c].type = t;
+                    if (!Art.isSpecial(g[r][c].type)) g[r][c].type = t;
                 }
             }
         } while (findMove() == null);
@@ -94,7 +96,7 @@ final class Board {
                 if (t >= 0) {
                     while (e < cols && typeAt(r, e) == t) e++;
                     if (e - c >= 3) {
-                        Run run = new Run(t);
+                        Run run = new Run(t, true);
                         for (int k = c; k < e; k++) run.tiles.add(g[r][k]);
                         out.add(run);
                     }
@@ -110,7 +112,7 @@ final class Board {
                 if (t >= 0) {
                     while (e < rows && typeAt(e, c) == t) e++;
                     if (e - r >= 3) {
-                        Run run = new Run(t);
+                        Run run = new Run(t, false);
                         for (int k = r; k < e; k++) run.tiles.add(g[k][c]);
                         out.add(run);
                     }
@@ -133,6 +135,7 @@ final class Board {
     }
 
     private boolean swapMatches(int r1, int c1, int r2, int c2) {
+        if (Art.isSpecial(g[r1][c1].type) || Art.isSpecial(g[r2][c2].type)) return true;
         swap(r1, c1, r2, c2);
         boolean ok = !findRuns().isEmpty();
         swap(r1, c1, r2, c2);
