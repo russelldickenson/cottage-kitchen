@@ -243,6 +243,33 @@ final class Gfx {
         c.drawLine(x1, y1, x2, y2, line);
     }
 
+    /** Speaker icon with sound waves, or a cross when muted. */
+    void speaker(Canvas c, float cx, float cy, float r, boolean muted) {
+        fill.setColor(Color.WHITE);
+        path.reset();
+        path.moveTo(cx - r * 0.55f, cy - r * 0.22f);
+        path.lineTo(cx - r * 0.25f, cy - r * 0.22f);
+        path.lineTo(cx + r * 0.1f, cy - r * 0.55f);
+        path.lineTo(cx + r * 0.1f, cy + r * 0.55f);
+        path.lineTo(cx - r * 0.25f, cy + r * 0.22f);
+        path.lineTo(cx - r * 0.55f, cy + r * 0.22f);
+        path.close();
+        c.drawPath(path, fill);
+        line.setColor(Color.WHITE);
+        line.setStrokeWidth(r * 0.14f);
+        if (muted) {
+            line.setColor(0xFFFF6A5A);
+            line.setStrokeWidth(r * 0.2f);
+            c.drawLine(cx + r * 0.3f, cy - r * 0.3f, cx + r * 0.75f, cy + r * 0.3f, line);
+            c.drawLine(cx + r * 0.75f, cy - r * 0.3f, cx + r * 0.3f, cy + r * 0.3f, line);
+        } else {
+            rf.set(cx - r * 0.1f, cy - r * 0.32f, cx + r * 0.5f, cy + r * 0.32f);
+            c.drawArc(rf, -50, 100, false, line);
+            rf.set(cx - r * 0.25f, cy - r * 0.6f, cx + r * 0.8f, cy + r * 0.6f);
+            c.drawArc(rf, -50, 100, false, line);
+        }
+    }
+
     void backArrow(Canvas c, float cx, float cy, float r) {
         line.setColor(Color.WHITE);
         line.setStrokeWidth(r * 0.3f);

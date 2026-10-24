@@ -6,6 +6,7 @@ import android.content.SharedPreferences;
 /** Everything that survives between sessions: unlocked levels, stars, total coins, tutorial cards seen. */
 final class Progress {
     int unlocked, totalCoins;
+    boolean soundOn;
     final int[] bestStars = new int[Level.COUNT];
     final boolean[] tipSeen = new boolean[Art.COUNT];
     private final SharedPreferences prefs;
@@ -14,6 +15,7 @@ final class Progress {
         prefs = ctx.getSharedPreferences("farm", Context.MODE_PRIVATE);
         unlocked = Math.max(1, prefs.getInt("unlocked", 1));
         totalCoins = prefs.getInt("coins", 0);
+        soundOn = prefs.getBoolean("sound", true);
         for (int t = Art.CROPS; t < Art.COUNT; t++) tipSeen[t] = prefs.getBoolean("tip_" + t, false);
         for (int i = 0; i < Level.COUNT; i++) bestStars[i] = prefs.getInt("stars_" + i, 0);
     }
@@ -27,6 +29,11 @@ final class Progress {
         totalCoins += coinsEarned;
         prefs.edit().putInt("coins", totalCoins).putInt("unlocked", unlocked)
                 .putInt("stars_" + levelIndex, bestStars[levelIndex]).apply();
+    }
+
+    void setSound(boolean on) {
+        soundOn = on;
+        prefs.edit().putBoolean("sound", on).apply();
     }
 
     void tipShown(int type) {

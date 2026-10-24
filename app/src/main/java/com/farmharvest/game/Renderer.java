@@ -209,7 +209,9 @@ final class Renderer {
             gfx.textC(c, p.text, p.x, p.y, p.size * s, Gfx.alpha(p.color, a), Gfx.alpha(0xFF4A2808, a), Paint.Align.CENTER);
         }
 
-        if (v.phase == Phase.BAG) {
+        if (v.confirmQuit) {
+            drawConfirm(c);
+        } else if (v.phase == Phase.BAG) {
             drawBag(c);
             drawButtons(c);
         } else if (v.phase == Phase.TIP) drawTip(c);
@@ -410,6 +412,18 @@ final class Renderer {
         c.restore();
     }
 
+    private void drawConfirm(Canvas c) {
+        c.drawColor(Color.argb(150, 0, 0, 0));
+        RectF o = v.confirmBox;
+        float ph = o.height();
+        gfx.rrect(c, o.left, o.top + 1.5f * v.u, o.right, o.bottom + 1.5f * v.u, 6 * v.u, Gfx.darken(WOOD, 0.6f));
+        gfx.rrect(c, o.left, o.top, o.right, o.bottom, 6 * v.u, WOOD);
+        gfx.rrect(c, o.left + v.u, o.top + v.u, o.right - v.u, o.bottom - v.u, 5 * v.u, CREAM);
+        gfx.textC(c, "Quit this level?", o.centerX(), o.top + ph * 0.12f, 7 * v.u, 0xFF6B3F17, 0, Paint.Align.CENTER);
+        gfx.textC(c, "Your progress in it will be lost.", o.centerX(), o.top + ph * 0.28f, 4.2f * v.u, 0xFF8B5A2B, 0, Paint.Align.CENTER);
+        drawButtons(c);
+    }
+
     private void drawEnd(Canvas c) {
         float fade = Math.min(1f, v.overlayT * 4f);
         c.drawColor(Color.argb((int) (150 * fade), 0, 0, 0));
@@ -474,6 +488,7 @@ final class Renderer {
             gfx.rrect(c, b.r.left + h * 0.08f, b.r.top + off + h * 0.07f, b.r.right - h * 0.08f, b.r.top + off + h * 0.45f, rad * 0.7f, 0x44FFFFFF);
         }
         if (b.back) gfx.backArrow(c, cx, cy + off, w * 0.5f);
+        else if (b.speaker) gfx.speaker(c, cx, cy + off, w * 0.42f, b.muted);
         else if (b.locked) gfx.lock(c, cx, cy + off, w * 0.26f);
         else if (b.circle) {
             boolean hasStars = b.stars >= 0;

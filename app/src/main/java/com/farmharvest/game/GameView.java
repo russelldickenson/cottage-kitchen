@@ -30,7 +30,7 @@ public class GameView extends View {
         final RectF r = new RectF();
         String text = "";
         int color = GREEN;
-        boolean circle, locked, pressed, back;
+        boolean circle, locked, pressed, back, speaker, muted;
         int stars = -1;
         Runnable act;
     }
@@ -40,6 +40,8 @@ public class GameView extends View {
     final Effects fx = new Effects(rnd, gfx);
     final Renderer renderer;
     final Progress progress;
+    final Sfx sfx;
+    boolean confirmQuit;
 
     final List<Button> buttons = new ArrayList<>();
     final List<Tile> dying = new ArrayList<>();
@@ -54,7 +56,7 @@ public class GameView extends View {
     // layout
     float W, H, topInset, botInset, u;
     float bx, by, cell, coinX, coinY, coinR;
-    final RectF boardPanel = new RectF(), goalPanel = new RectF(), overlay = new RectF(), tipBox = new RectF();
+    final RectF boardPanel = new RectF(), goalPanel = new RectF(), overlay = new RectF(), tipBox = new RectF(), confirmBox = new RectF();
 
     // play state
     Screen screen = Screen.TITLE;
@@ -76,6 +78,8 @@ public class GameView extends View {
     public GameView(Context ctx) {
         super(ctx);
         progress = new Progress(ctx);
+        sfx = new Sfx(ctx);
+        sfx.enabled = progress.soundOn;
         renderer = new Renderer(ctx, this, gfx, fx);
         setOnApplyWindowInsetsListener((v, insets) -> {
             topInset = insets.getSystemWindowInsetTop();
@@ -116,6 +120,7 @@ public class GameView extends View {
         boardPanel.set(bx - pad, by - pad, bx + bw + pad, by + bh + pad);
         overlay.set(W * 0.08f, H * 0.2f, W * 0.92f, H * 0.8f);
         tipBox.set(W * 0.1f, H * 0.22f, W * 0.9f, H * 0.78f);
+        confirmBox.set(W * 0.1f, H * 0.32f, W * 0.9f, H * 0.68f);
         coinR = hh * 0.5f;
         coinX = m + hh + m * 0.8f + hh * 0.6f;
         coinY = hudTop + hh / 2;
@@ -124,7 +129,18 @@ public class GameView extends View {
     private void buildButtons() {
         buttons.clear();
         float m = 3 * u, hh = 13 * u;
-        if (screen == Screen.TITLE) {
+        if (screen == Screen.PLAY && confirmQuit) {
+            float pw = confirmBox.width(), ph = confirmBox.height(), bh = ph * 0.17f;
+            addWide(confirmBox.centerX(), confirmBox.top + ph * 0.52f, pw * 0.7f, bh, "KEEP PLAYING", GREEN, () -> {
+                confirmQuit = false;
+                buildButtons();
+            });
+            addWide(confirmBox.centerX(), confirmBox.top + ph * 0.79f, pw * 0.5f, bh, "QUIT", ORANGE, () -> {
+                confirmQuit = false;
+                goLevels();
+            });
+        } else if (screen == Screen.TITLE) {
+            addSpeaker(m, topInset + m, hh);
             Button b = new Button();
             b.r.set(W * 0.2f, H * 0.66f, W * 0.8f, H * 0.66f + 17 * u);
             b.text = "PLAY";
@@ -132,6 +148,7 @@ public class GameView extends View {
             buttons.add(b);
         } else if (screen == Screen.LEVELS) {
             addBack(m, topInset + m, hh, this::goTitle);
+            addSpeaker(W - m - hh, topInset + m, hh);
             float areaTop = topInset + m + hh + 8 * u;
             float areaH = H - botInset - m - areaTop;
             float d = Math.min(W * 0.24f, areaH / 5f * 0.82f);
@@ -171,8 +188,24 @@ public class GameView extends View {
                 addWide(cx, overlay.top + ph * 0.80f, pw * 0.5f, bh, "MENU", BLUE, this::goLevels);
             }
         } else {
-            addBack(m, topInset + m, hh, this::goLevels);
+            addBack(m, topInset + m, hh, this::askQuit);
         }
+    }
+
+    private void addSpeaker(float x, float y, float d) {
+        Button b = new Button();
+        b.r.set(x, y, x + d, y + d);
+        b.circle = true;
+        b.speaker = true;
+        b.muted = !progress.soundOn;
+        b.color = BLUE;
+        b.act = () -> {
+            progress.setSound(!progress.soundOn);
+            sfx.enabled = progress.soundOn;
+            sfx.click();
+            buildButtons();
+        };
+        buttons.add(b);
     }
 
     private void addBack(float x, float y, float d, Runnable act) {
@@ -198,7 +231,12 @@ public class GameView extends View {
 
     boolean onBack() {
         if (screen == Screen.PLAY) {
-            goLevels();
+            if (confirmQuit) {
+                confirmQuit = false;
+                buildButtons();
+            } else {
+                askQuit();
+            }
             return true;
         }
         if (screen == Screen.LEVELS) {
@@ -208,12 +246,27 @@ public class GameView extends View {
         return false;
     }
 
+    /** Back arrow / system back during a level: ask first, unless the level is already decided. */
+    private void askQuit() {
+        if (screen == Screen.PLAY && phase != Phase.END && phase != Phase.BAG) {
+            confirmQuit = true;
+            buildButtons();
+        } else {
+            goLevels();
+        }
+    }
+
+    void release() {
+        sfx.release();
+    }
+
     private void goTitle() {
         screen = Screen.TITLE;
         buildButtons();
     }
 
     private void goLevels() {
+        confirmQuit = false;
         screen = Screen.LEVELS;
         phase = Phase.IDLE;
         buildButtons();
@@ -221,6 +274,7 @@ public class GameView extends View {
 
     private void startLevel(int idx) {
         levelIndex = idx;
+        confirmQuit = false;
         level = Level.get(idx);
         board = new Board(COLS, ROWS, level.kinds, rnd);
         need = new int[Art.COUNT];
@@ -253,9 +307,12 @@ public class GameView extends View {
         else dispCoins += (target - dispCoins) * Math.min(1f, dt * 9f) + Math.signum(target - dispCoins) * dt * 20;
 
         fx.update(dt, u);
-        landed += fx.takeLanded() - fx.takeBagLanded();
+        int coinsIn = fx.takeLanded(), bagIn = fx.takeBagLanded();
+        landed += coinsIn - bagIn;
+        if (coinsIn > 0) sfx.coin();
+        if (bagIn > 0) sfx.bagCoin(1f - Math.max(0, landed) / (float) bagTotal);
         for (Button b : buttons) if (b != downButton) b.pressed = false;
-        if (screen != Screen.PLAY) return;
+        if (screen != Screen.PLAY || confirmQuit) return;
 
         for (int r = 0; r < ROWS; r++) {
             for (int c = 0; c < COLS; c++) {
@@ -280,6 +337,7 @@ public class GameView extends View {
                         activateSpecial(swapA, swapB);
                     } else if (runs.isEmpty()) {
                         board.swap(swapA.r, swapA.c, swapB.r, swapB.c);
+                        sfx.badSwap();
                         phase = Phase.SWAPBACK;
                     } else {
                         movesLeft--;
@@ -326,6 +384,7 @@ public class GameView extends View {
                     if (bagEndT < 0) bagEndT = bagT;
                     if (bagT - bagEndT > 0.6f) {
                         phase = Phase.END;
+                        sfx.win();
                         overlayT = 0;
                         buildButtons();
                     }
@@ -382,6 +441,7 @@ public class GameView extends View {
         fxTile = null;
         dying.clear();
         spawns = Rules.findSpawns(runs, swapA, swapB, rnd);
+        sfx.match(combo);
         swapA = swapB = null;
 
         Set<Tile> seen = new HashSet<>();
@@ -453,6 +513,7 @@ public class GameView extends View {
             fx.coin(cx(t), cy(t), d + rnd.nextFloat() * 0.1f, i == list.size() - 1 ? gain - share * (list.size() - 1) : share);
         }
         act.dyDelay = maxDelay;
+        sfx.powerUpPlayed(act.type);
         clearDuration = CLEAR_TIME + maxDelay;
         String name = act.type == Art.GOLDEN_EGG ? "Golden Harvest!" : act.type == Art.TRACTOR ? "Rainbow Roundup!"
                 : act.type == Art.TNT ? "Boom!" : "Scarecrow Sweep!";
@@ -468,6 +529,7 @@ public class GameView extends View {
             Tile t = spawns.tiles.get(i);
             t.type = spawns.types.get(i);
             if (!progress.tipSeen[t.type] && pendingTip < 0) pendingTip = t.type;
+            sfx.powerUpMade();
             t.scale = 0f;
             fx.sparkle(cx(t), cy(t), u, cell);
             fx.sparkle(cx(t), cy(t), u, cell);
@@ -486,6 +548,7 @@ public class GameView extends View {
             if (board.findMove() == null) {
                 board.reshuffle();
                 for (Tile[] row : board.g) for (Tile t : row) t.scale = 0f;
+                sfx.swap();
                 addPop("Shuffle!", W / 2, by + cell * 3.5f, cell * 0.9f, 1.2f, 0xFF9BE15D);
             }
             phase = Phase.IDLE;
@@ -520,6 +583,7 @@ public class GameView extends View {
         phase = Phase.END;
         overlayT = 0;
         won = win;
+        if (!win) sfx.lose();
         bonus = 0;
         stars = 0;
         if (win) {
@@ -536,6 +600,7 @@ public class GameView extends View {
     private void attemptSwap(Tile a, Tile b) {
         if (phase != Phase.IDLE || Math.abs(a.r - b.r) + Math.abs(a.c - b.c) != 1) return;
         board.swap(a.r, a.c, b.r, b.c);
+        sfx.swap();
         swapA = a;
         swapB = b;
         selected = null;
@@ -590,7 +655,10 @@ public class GameView extends View {
                     Button b = downButton;
                     downButton = null;
                     b.pressed = false;
-                    if (b.r.contains(x, y) && b.act != null) b.act.run();
+                    if (b.r.contains(x, y) && b.act != null) {
+                        if (!b.speaker) sfx.click();
+                        b.act.run();
+                    }
                 } else if (downTile != null && !dragged && phase == Phase.IDLE && tileAt(x, y) == downTile) {
                     tap(downTile);
                 }
