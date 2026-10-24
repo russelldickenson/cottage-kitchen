@@ -1,42 +1,32 @@
 package com.farmharvest.game;
 
+import static com.farmharvest.game.Gfx.BLUE;
+import static com.farmharvest.game.Gfx.GREEN;
+import static com.farmharvest.game.Gfx.ORANGE;
+
 import android.content.Context;
-import android.content.SharedPreferences;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.LinearGradient;
-import android.graphics.Paint;
-import android.graphics.Path;
-import android.graphics.Rect;
 import android.graphics.RectF;
-import android.graphics.Shader;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.WindowInsets;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
-/** Renders every screen (title, level select, play) and drives the match-3 state machine. */
+/** Owns the game state, runs the match-3 state machine and handles touch input. Drawing is in Renderer. */
 public class GameView extends View {
-    private enum Screen {TITLE, LEVELS, PLAY}
+    enum Screen {TITLE, LEVELS, PLAY}
 
-    private enum Phase {IDLE, SWAP, SWAPBACK, CLEAR, FALL, BAG, TIP, END}
+    enum Phase {IDLE, SWAP, SWAPBACK, CLEAR, FALL, BAG, TIP, END}
 
-    private static final int COLS = 7, ROWS = 8;
+    static final int COLS = Rules.COLS, ROWS = Rules.ROWS;
     private static final float SWAP_SPEED = 9f, GRAVITY = 45f, CLEAR_TIME = 0.28f;
 
-    private static final int GREEN = 0xFF5BC236, ORANGE = 0xFFFF9B26, BLUE = 0xFF3FA9F5, PANEL = 0xFF6B3F17;
-    private static final int CREAM = 0xFFFFF4D2, WOOD = 0xFF8B5A2B;
-
-    private static final class Button {
+    static final class Button {
         final RectF r = new RectF();
         String text = "";
         int color = GREEN;
@@ -45,85 +35,48 @@ public class GameView extends View {
         Runnable act;
     }
 
-    private static final class Particle {
-        float x, y, vx, vy, life, max, size;
-        int color;
-    }
+    final Gfx gfx = new Gfx();
+    final Random rnd = new Random();
+    final Effects fx = new Effects(rnd, gfx);
+    final Renderer renderer;
+    final Progress progress;
 
-    private static final class Flyer {
-        float sx, sy, delay, t;
-        int value;
-    }
-
-    private static final class Pop {
-        float x, y, life, max, size;
-        String text;
-        int color;
-    }
-
-    private final Gfx gfx = new Gfx();
-    private final Random rnd = new Random();
-    private final Bitmap[] art = new Bitmap[Art.COUNT];
-    private final SharedPreferences prefs;
-    private final Paint bmp = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
-    private final Paint sky = new Paint();
-    private final Paint plain = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Path hill1 = new Path(), hill2 = new Path();
-    private final Rect src = new Rect();
-    private final RectF dst = new RectF();
-
-    private final List<Button> buttons = new ArrayList<>();
-    private final List<Particle> particles = new ArrayList<>();
-    private final List<Flyer> flyers = new ArrayList<>();
-    private final List<Pop> pops = new ArrayList<>();
-    private final List<Tile> dying = new ArrayList<>();
-    private final List<Flyer> bagFlyers = new ArrayList<>();
-    private final List<Tile> spawnTiles = new ArrayList<>();
-    private final List<Integer> spawnTypes = new ArrayList<>();
-    private Tile fxTile;
-    private float clearDuration = CLEAR_TIME;
-    private static final float BAG_PAUSE = 1f, BAG_POP = 0.35f, BAG_FLY = 0.5f;
-    private float bagT, bagBump, bagEndT, tipT;
-    private int pendingTip = -1, tipType;
-    private final boolean[] tipSeen = new boolean[Art.COUNT];
-    private int bagTotal;
+    final List<Button> buttons = new ArrayList<>();
+    final List<Tile> dying = new ArrayList<>();
+    Rules.Spawns spawns = new Rules.Spawns();
+    Tile fxTile;
+    float clearDuration = CLEAR_TIME;
+    static final float BAG_PAUSE = 1f, BAG_POP = 0.35f;
+    float bagT, bagEndT, tipT;
+    int pendingTip = -1, tipType;
+    int bagTotal;
 
     // layout
-    private float W, H, topInset, botInset, u;
-    private float bx, by, cell, coinX, coinY, coinR;
-    private final RectF boardPanel = new RectF(), goalPanel = new RectF(), overlay = new RectF(), tipBox = new RectF();
-
-    // persistent progress
-    private int unlocked, totalCoins;
-    private final int[] bestStars = new int[Level.COUNT];
+    float W, H, topInset, botInset, u;
+    float bx, by, cell, coinX, coinY, coinR;
+    final RectF boardPanel = new RectF(), goalPanel = new RectF(), overlay = new RectF(), tipBox = new RectF();
 
     // play state
-    private Screen screen = Screen.TITLE;
-    private Phase phase = Phase.IDLE;
-    private Level level;
-    private int levelIndex;
-    private Board board;
-    private int[] need = new int[Art.COUNT];
-    private int movesLeft, coins, landed, combo, stars, bonus;
-    private boolean won;
-    private float dispCoins, bump, idleTime, clearTimer, overlayT, time;
-    private Tile selected, swapA, swapB, downTile;
-    private int[] hint;
-    private Button downButton;
-    private float downX, downY;
-    private boolean dragged;
-    private long last;
+    Screen screen = Screen.TITLE;
+    Phase phase = Phase.IDLE;
+    Level level;
+    int levelIndex;
+    Board board;
+    int[] need = new int[Art.COUNT];
+    int movesLeft, coins, landed, combo, stars, bonus;
+    boolean won;
+    float dispCoins, idleTime, clearTimer, overlayT, time;
+    Tile selected, swapA, swapB, downTile;
+    int[] hint;
+    Button downButton;
+    float downX, downY;
+    boolean dragged;
+    long last;
 
     public GameView(Context ctx) {
         super(ctx);
-        prefs = ctx.getSharedPreferences("farm", Context.MODE_PRIVATE);
-        BitmapFactory.Options o = new BitmapFactory.Options();
-        o.inScaled = false;
-        for (int i = 0; i < Art.COUNT; i++) art[i] = BitmapFactory.decodeResource(getResources(), Art.RES[i], o);
-        unlocked = Math.max(1, prefs.getInt("unlocked", 1));
-        totalCoins = prefs.getInt("coins", 0);
-        for (int t = Art.CROPS; t < Art.COUNT; t++) tipSeen[t] = prefs.getBoolean("tip_" + t, false);
-        for (int i = 0; i < Level.COUNT; i++) bestStars[i] = prefs.getInt("stars_" + i, 0);
+        progress = new Progress(ctx);
+        renderer = new Renderer(ctx, this, gfx, fx);
         setOnApplyWindowInsetsListener((v, insets) -> {
             topInset = insets.getSystemWindowInsetTop();
             botInset = insets.getSystemWindowInsetBottom();
@@ -142,21 +95,7 @@ public class GameView extends View {
         W = w;
         H = h;
         u = W / 100f;
-        sky.setShader(new LinearGradient(0, 0, 0, H, 0xFF6EC8F5, 0xFFE4F6FF, Shader.TileMode.CLAMP));
-        hill1.reset();
-        hill1.moveTo(0, H * 0.80f);
-        hill1.quadTo(W * 0.25f, H * 0.68f, W * 0.55f, H * 0.78f);
-        hill1.quadTo(W * 0.82f, H * 0.87f, W, H * 0.74f);
-        hill1.lineTo(W, H);
-        hill1.lineTo(0, H);
-        hill1.close();
-        hill2.reset();
-        hill2.moveTo(0, H * 0.90f);
-        hill2.quadTo(W * 0.3f, H * 0.80f, W * 0.65f, H * 0.90f);
-        hill2.quadTo(W * 0.85f, H * 0.96f, W, H * 0.87f);
-        hill2.lineTo(W, H);
-        hill2.lineTo(0, H);
-        hill2.close();
+        renderer.onSize(W, H);
         layout();
         buildButtons();
     }
@@ -205,16 +144,15 @@ public class GameView extends View {
                 b.r.set(x, y, x + d, y + d);
                 b.circle = true;
                 b.text = String.valueOf(i + 1);
-                b.locked = i >= unlocked;
-                b.color = i == unlocked - 1 ? ORANGE : GREEN;
-                b.stars = b.locked ? -1 : bestStars[i];
+                b.locked = i >= progress.unlocked;
+                b.color = i == progress.unlocked - 1 ? ORANGE : GREEN;
+                b.stars = b.locked ? -1 : progress.bestStars[i];
                 if (!b.locked) b.act = () -> startLevel(idx);
                 buttons.add(b);
             }
         } else if (phase == Phase.TIP) {
             addWide(tipBox.centerX(), tipBox.top + tipBox.height() * 0.9f, tipBox.width() * 0.6f, tipBox.height() * 0.11f, "GOT IT!", GREEN, () -> {
-                tipSeen[tipType] = true;
-                prefs.edit().putBoolean("tip_" + tipType, true).apply();
+                progress.tipShown(tipType);
                 phase = Phase.IDLE;
                 idleTime = 0;
                 buildButtons();
@@ -294,11 +232,8 @@ public class GameView extends View {
         combo = 0;
         selected = null;
         hint = null;
-        particles.clear();
-        flyers.clear();
-        pops.clear();
+        fx.clear();
         dying.clear();
-        bagFlyers.clear();
         pendingTip = -1;
         for (int r = 0; r < ROWS; r++) {
             for (int c = 0; c < COLS; c++) board.g[r][c].y = r - ROWS - rnd.nextFloat() * 1.5f - (COLS - c) * 0.1f;
@@ -313,52 +248,12 @@ public class GameView extends View {
 
     private void update(float dt) {
         time += dt;
-        bump = Math.max(0, bump - dt * 4);
-        float target = screen == Screen.PLAY ? landed : totalCoins;
+        float target = screen == Screen.PLAY ? landed : progress.totalCoins;
         if (Math.abs(target - dispCoins) < 1) dispCoins = target;
         else dispCoins += (target - dispCoins) * Math.min(1f, dt * 9f) + Math.signum(target - dispCoins) * dt * 20;
 
-        for (int i = particles.size() - 1; i >= 0; i--) {
-            Particle p = particles.get(i);
-            p.life -= dt;
-            p.vy += 60 * u * dt;
-            p.x += p.vx * dt;
-            p.y += p.vy * dt;
-            if (p.life <= 0) particles.remove(i);
-        }
-        for (int i = pops.size() - 1; i >= 0; i--) {
-            Pop p = pops.get(i);
-            p.life -= dt;
-            p.y -= 8 * u * dt;
-            if (p.life <= 0) pops.remove(i);
-        }
-        for (int i = flyers.size() - 1; i >= 0; i--) {
-            Flyer f = flyers.get(i);
-            if (f.delay > 0) {
-                f.delay -= dt;
-                continue;
-            }
-            f.t += dt / 0.65f;
-            if (f.t >= 1) {
-                landed += f.value;
-                bump = 1;
-                flyers.remove(i);
-            }
-        }
-        bagBump = Math.max(0, bagBump - dt * 5);
-        for (int i = bagFlyers.size() - 1; i >= 0; i--) {
-            Flyer f = bagFlyers.get(i);
-            if (f.delay > 0) {
-                f.delay -= dt;
-                continue;
-            }
-            f.t += dt / BAG_FLY;
-            if (f.t >= 1) {
-                landed -= f.value;
-                bagBump = 1;
-                bagFlyers.remove(i);
-            }
-        }
+        fx.update(dt, u);
+        landed += fx.takeLanded() - fx.takeBagLanded();
         for (Button b : buttons) if (b != downButton) b.pressed = false;
         if (screen != Screen.PLAY) return;
 
@@ -406,7 +301,7 @@ public class GameView extends View {
                     if (p < 0) continue;
                     if (!t.popped) {
                         t.popped = true;
-                        sparkle(cx(t), cy(t));
+                        fx.sparkle(cx(t), cy(t), u, cell);
                     }
                     p = Math.min(1f, p);
                     float s = p < 0.3f ? 1f + 0.3f * (p / 0.3f) : 1.3f * (1f - (p - 0.3f) / 0.7f);
@@ -427,7 +322,7 @@ public class GameView extends View {
                 break;
             case BAG:
                 bagT += dt;
-                if (bagT >= BAG_PAUSE + BAG_POP && bagFlyers.isEmpty()) {
+                if (bagT >= BAG_PAUSE + BAG_POP && fx.bagFlyers.isEmpty()) {
                     if (bagEndT < 0) bagEndT = bagT;
                     if (bagT - bagEndT > 0.6f) {
                         phase = Phase.END;
@@ -480,45 +375,20 @@ public class GameView extends View {
         return settled;
     }
 
-    private void addSpawn(Tile t, int type) {
-        if (spawnTiles.contains(t)) return;
-        spawnTiles.add(t);
-        spawnTypes.add(type);
-    }
-
     private void startClear(List<Board.Run> runs) {
         phase = Phase.CLEAR;
         clearTimer = 0;
         clearDuration = CLEAR_TIME;
         fxTile = null;
         dying.clear();
-        spawnTiles.clear();
-        spawnTypes.clear();
-        // 5+ in a row makes a colour-clearer; a T or L (a horizontal and a vertical run sharing a tile) makes a bomb
-        for (Board.Run run : runs) {
-            if (run.tiles.size() < 5) continue;
-            Tile at = run.tiles.contains(swapA) ? swapA : run.tiles.contains(swapB) ? swapB : run.tiles.get(run.tiles.size() / 2);
-            addSpawn(at, rnd.nextBoolean() ? Art.GOLDEN_EGG : Art.TRACTOR);
-        }
-        for (Board.Run h : runs) {
-            if (!h.horizontal) continue;
-            for (Board.Run v : runs) {
-                if (v.horizontal || v.type != h.type) continue;
-                for (Tile t : h.tiles) {
-                    if (v.tiles.contains(t)) {
-                        addSpawn(t, rnd.nextBoolean() ? Art.TNT : Art.SCARECROW);
-                        break;
-                    }
-                }
-            }
-        }
+        spawns = Rules.findSpawns(runs, swapA, swapB, rnd);
         swapA = swapB = null;
 
         Set<Tile> seen = new HashSet<>();
         boolean first = true;
         for (Board.Run run : runs) {
             int n = run.tiles.size();
-            int gain = (n * 10 + Math.max(0, n - 3) * 15) * combo;
+            int gain = Rules.runCoins(n, combo);
             coins += gain;
             float ax = 0, ay = 0;
             int share = gain / n;
@@ -526,15 +396,10 @@ public class GameView extends View {
                 Tile t = run.tiles.get(i);
                 ax += cx(t);
                 ay += cy(t);
-                Flyer f = new Flyer();
-                f.sx = cx(t);
-                f.sy = cy(t);
-                f.delay = rnd.nextFloat() * 0.12f;
-                f.value = i == n - 1 ? gain - share * (n - 1) : share;
-                flyers.add(f);
+                fx.coin(cx(t), cy(t), rnd.nextFloat() * 0.12f, i == n - 1 ? gain - share * (n - 1) : share);
                 if (seen.add(t)) {
                     if (need[t.type] > 0) need[t.type]--;
-                    if (!spawnTiles.contains(t)) {
+                    if (!spawns.tiles.contains(t)) {
                         t.dying = true;
                         t.dyDelay = 0;
                         dying.add(t);
@@ -545,68 +410,29 @@ public class GameView extends View {
             if (first && combo > 1) addPop("Combo x" + combo + "!", W / 2, by + cell * 1.2f, cell * 0.8f, 1.1f, 0xFFFFD43B);
             first = false;
         }
-        if (!spawnTiles.isEmpty()) addPop(spawnTypes.get(0) == Art.GOLDEN_EGG || spawnTypes.get(0) == Art.TRACTOR ? "Super Harvest!" : "Big Bang!",
+        if (!spawns.tiles.isEmpty()) addPop(spawns.types.get(0) == Art.GOLDEN_EGG || spawns.types.get(0) == Art.TRACTOR ? "Super Harvest!" : "Big Bang!",
                 W / 2, by + cell * 2.4f, cell * 0.85f, 1.2f, 0xFFFF9B26);
     }
 
     private void addPop(String text, float x, float y, float size, float life, int color) {
-        Pop p = new Pop();
-        p.x = x;
-        p.y = y;
-        p.text = text;
-        float tw = gfx.width(text, size);
-        p.size = tw > W * 0.88f ? size * W * 0.88f / tw : size;
-        p.life = p.max = life;
-        p.color = color;
-        pops.add(p);
+        fx.pop(text, x, y, size, life, color, W * 0.88f);
     }
 
     /** One of the swapped tiles is a power-up: work out what it takes with it. */
     private void activateSpecial(Tile a, Tile b) {
-        boolean ac = Art.isColor(a.type), bc = Art.isColor(b.type);
-        boolean as = Art.isSpecial(a.type), bs = Art.isSpecial(b.type);
-        Set<Tile> set = new LinkedHashSet<>();
-        Tile act;
-        if ((ac || bc) && as && bs) {
-            act = ac ? a : b;
-            for (Tile[] row : board.g) for (Tile t : row) if (t != null) set.add(t);
-        } else if (ac || bc) {
-            act = ac ? a : b;
-            Tile other = ac ? b : a;
-            for (Tile[] row : board.g) for (Tile t : row) if (t != null && t.type == other.type) set.add(t);
-            set.add(act);
-        } else {
-            act = Art.isBomb(a.type) ? a : b;
-            ArrayDeque<Tile> q = new ArrayDeque<>();
-            for (Tile t : new Tile[]{a, b}) {
-                if (Art.isBomb(t.type) && set.add(t)) q.add(t);
-            }
-            while (!q.isEmpty()) {
-                Tile t = q.poll();
-                for (int dr = -1; dr <= 1; dr++) {
-                    for (int dc = -1; dc <= 1; dc++) {
-                        int nr = t.r + dr, nc = t.c + dc;
-                        if (nr < 0 || nc < 0 || nr >= ROWS || nc >= COLS) continue;
-                        Tile n = board.g[nr][nc];
-                        if (n != null && set.add(n) && Art.isBomb(n.type)) q.add(n);
-                    }
-                }
-            }
-        }
-        beginSpecialClear(set, act);
+        beginSpecialClear(Rules.specialClearSet(board, a, b), Rules.activator(a, b));
     }
 
     private void beginSpecialClear(Set<Tile> set, final Tile act) {
         phase = Phase.CLEAR;
         clearTimer = 0;
         dying.clear();
-        spawnTiles.clear();
-        spawnTypes.clear();
+        spawns = new Rules.Spawns();
         fxTile = act;
         swapA = swapB = null;
         List<Tile> list = new ArrayList<>(set);
         list.sort((x, y) -> Integer.compare(Math.abs(x.r - act.r) + Math.abs(x.c - act.c), Math.abs(y.r - act.r) + Math.abs(y.c - act.c)));
-        int gain = list.size() * 12 * combo;
+        int gain = Rules.specialCoins(list.size(), combo);
         coins += gain;
         int share = gain / list.size();
         float maxDelay = 0;
@@ -624,12 +450,7 @@ public class GameView extends View {
             maxDelay = Math.max(maxDelay, d);
             ax += cx(t);
             ay += cy(t);
-            Flyer f = new Flyer();
-            f.sx = cx(t);
-            f.sy = cy(t);
-            f.delay = d + rnd.nextFloat() * 0.1f;
-            f.value = i == list.size() - 1 ? gain - share * (list.size() - 1) : share;
-            flyers.add(f);
+            fx.coin(cx(t), cy(t), d + rnd.nextFloat() * 0.1f, i == list.size() - 1 ? gain - share * (list.size() - 1) : share);
         }
         act.dyDelay = maxDelay;
         clearDuration = CLEAR_TIME + maxDelay;
@@ -643,24 +464,21 @@ public class GameView extends View {
         for (Tile t : dying) board.g[t.r][t.c] = null;
         dying.clear();
         fxTile = null;
-        for (int i = 0; i < spawnTiles.size(); i++) {
-            Tile t = spawnTiles.get(i);
-            t.type = spawnTypes.get(i);
-            if (!tipSeen[t.type] && pendingTip < 0) pendingTip = t.type;
+        for (int i = 0; i < spawns.tiles.size(); i++) {
+            Tile t = spawns.tiles.get(i);
+            t.type = spawns.types.get(i);
+            if (!progress.tipSeen[t.type] && pendingTip < 0) pendingTip = t.type;
             t.scale = 0f;
-            sparkle(cx(t), cy(t));
-            sparkle(cx(t), cy(t));
+            fx.sparkle(cx(t), cy(t), u, cell);
+            fx.sparkle(cx(t), cy(t), u, cell);
         }
-        spawnTiles.clear();
-        spawnTypes.clear();
+        spawns = new Rules.Spawns();
         board.collapse();
         phase = Phase.FALL;
     }
 
     private void afterSettle() {
-        boolean allDone = true;
-        for (int n : need) if (n > 0) allDone = false;
-        if (allDone) {
+        if (Rules.goalsDone(need)) {
             endLevel(true);
         } else if (movesLeft <= 0) {
             endLevel(false);
@@ -668,14 +486,7 @@ public class GameView extends View {
             if (board.findMove() == null) {
                 board.reshuffle();
                 for (Tile[] row : board.g) for (Tile t : row) t.scale = 0f;
-                Pop p = new Pop();
-                p.x = W / 2;
-                p.y = by + cell * 3.5f;
-                p.text = "Shuffle!";
-                p.size = cell * 0.9f;
-                p.life = p.max = 1.2f;
-                p.color = 0xFF9BE15D;
-                pops.add(p);
+                addPop("Shuffle!", W / 2, by + cell * 3.5f, cell * 0.9f, 1.2f, 0xFF9BE15D);
             }
             phase = Phase.IDLE;
             idleTime = 0;
@@ -695,16 +506,13 @@ public class GameView extends View {
         bagT = 0;
         bagEndT = -1;
         bagTotal = Math.max(1, coins);
-        flyers.clear();
+        fx.flyers.clear();
         landed = coins;
-        bagFlyers.clear();
+        fx.bagFlyers.clear();
         int n = Math.min(26, Math.max(8, coins / 20));
         int share = coins / n;
         for (int i = 0; i < n; i++) {
-            Flyer f = new Flyer();
-            f.delay = BAG_PAUSE + BAG_POP + i * 0.035f;
-            f.value = i == n - 1 ? coins - share * (n - 1) : share;
-            bagFlyers.add(f);
+            fx.bagCoin(BAG_PAUSE + BAG_POP + i * 0.035f, i == n - 1 ? coins - share * (n - 1) : share);
         }
     }
 
@@ -715,17 +523,12 @@ public class GameView extends View {
         bonus = 0;
         stars = 0;
         if (win) {
-            bonus = movesLeft * 30;
+            bonus = movesLeft * Rules.MOVE_BONUS;
             coins += bonus;
             landed += bonus;
-            float ratio = movesLeft / (float) level.moves;
-            stars = ratio >= 0.4f ? 3 : ratio >= 0.15f ? 2 : 1;
-            bestStars[levelIndex] = Math.max(bestStars[levelIndex], stars);
-            unlocked = Math.max(unlocked, Math.min(Level.COUNT, levelIndex + 2));
+            stars = Rules.stars(movesLeft, level.moves);
         }
-        totalCoins += coins;
-        prefs.edit().putInt("coins", totalCoins).putInt("unlocked", unlocked)
-                .putInt("stars_" + levelIndex, bestStars[levelIndex]).apply();
+        progress.levelFinished(levelIndex, stars, coins);
         if (win) startBag();
         buildButtons();
     }
@@ -740,28 +543,12 @@ public class GameView extends View {
         phase = Phase.SWAP;
     }
 
-    private float cx(Tile t) {
+    float cx(Tile t) {
         return bx + (t.x + 0.5f) * cell;
     }
 
-    private float cy(Tile t) {
+    float cy(Tile t) {
         return by + (t.y + 0.5f) * cell;
-    }
-
-    private void sparkle(float x, float y) {
-        for (int i = 0; i < 7; i++) {
-            Particle p = new Particle();
-            double a = rnd.nextDouble() * Math.PI * 2;
-            float sp = (15 + rnd.nextFloat() * 30) * u;
-            p.x = x;
-            p.y = y;
-            p.vx = (float) Math.cos(a) * sp;
-            p.vy = (float) Math.sin(a) * sp - 15 * u;
-            p.life = p.max = 0.5f + rnd.nextFloat() * 0.3f;
-            p.size = cell * (0.08f + rnd.nextFloat() * 0.1f);
-            p.color = i % 2 == 0 ? 0xFFFFE066 : Color.WHITE;
-            particles.add(p);
-        }
     }
 
     // ---------------------------------------------------------------- input
@@ -848,424 +635,9 @@ public class GameView extends View {
         last = now;
         if (W > 0) {
             update(dt);
-            drawBackground(c);
-            if (screen == Screen.TITLE) drawTitle(c);
-            else if (screen == Screen.LEVELS) drawLevels(c);
-            else drawPlay(c);
+            renderer.draw(c);
         }
         postInvalidateOnAnimation();
     }
 
-    private void drawBackground(Canvas c) {
-        c.drawRect(0, 0, W, H, sky);
-        gfx.circle(c, W * 0.85f, H * 0.12f + topInset * 0.3f, 11 * u, 0x55FFF3A0);
-        gfx.circle(c, W * 0.85f, H * 0.12f + topInset * 0.3f, 7 * u, 0xFFFFE066);
-        for (int i = 0; i < 3; i++) {
-            float x = ((time * (3 + i * 1.5f) * u + i * W * 0.45f) % (W * 1.5f)) - W * 0.25f;
-            float y = H * (0.13f + i * 0.09f);
-            float s = u * (5 + i);
-            gfx.ellipse(c, x, y, s * 2.6f, s * 1.1f, 0xCCFFFFFF);
-            gfx.circle(c, x - s * 0.8f, y - s * 0.6f, s * 1.2f, 0xCCFFFFFF);
-            gfx.circle(c, x + s * 0.7f, y - s * 0.8f, s * 1.5f, 0xCCFFFFFF);
-        }
-        plain.setColor(0xFF8BD450);
-        c.drawPath(hill1, plain);
-        plain.setColor(0xFF68B83A);
-        c.drawPath(hill2, plain);
-    }
-
-    private void drawIcon(Canvas c, int type, float cx, float cy, float size) {
-        Bitmap b = art[type];
-        src.set(0, 0, b.getWidth(), b.getHeight());
-        dst.set(cx - size / 2, cy - size / 2, cx + size / 2, cy + size / 2);
-        c.drawBitmap(b, src, dst, bmp);
-    }
-
-    private void drawCoinPill(Canvas c, float l, float t, float r, float b, int value) {
-        float h = b - t;
-        gfx.rrect(c, l, t + h * 0.07f, r, b + h * 0.07f, h / 2, Gfx.darken(PANEL, 0.6f));
-        gfx.rrect(c, l, t, r, b, h / 2, PANEL);
-        gfx.rrectLine(c, l + h * 0.03f, t + h * 0.03f, r - h * 0.03f, b - h * 0.03f, h / 2, h * 0.06f, 0xFFC98A4B);
-        float s = 1f + 0.25f * bump;
-        c.save();
-        c.scale(s, s, l + h * 0.2f, (t + b) / 2);
-        gfx.coinPile(c, l + h * 0.2f, (t + b) / 2, h * 0.5f);
-        c.restore();
-        gfx.textC(c, String.valueOf(value), l + h * 0.9f, (t + b) / 2, h * 0.55f, Color.WHITE, 0xFF3A1F08, Paint.Align.LEFT);
-    }
-
-    private void drawTitle(Canvas c) {
-        c.save();
-        c.rotate(-4, W / 2, H * 0.2f);
-        gfx.text(c, "Farm", W / 2, H * 0.2f, W * 0.24f, 0xFFFFD43B, 0xFF7A3E0B, Paint.Align.CENTER);
-        gfx.text(c, "Harvest", W / 2, H * 0.2f + W * 0.2f, W * 0.2f, 0xFF7ED957, 0xFF1F5F10, Paint.Align.CENTER);
-        c.restore();
-        int[] show = {1, 0, 5, 4, 2};
-        for (int i = 0; i < show.length; i++) {
-            float x = W * (0.14f + i * 0.18f);
-            float y = H * 0.5f - Math.abs((float) Math.sin(time * 3 + i * 0.9f)) * 4 * u;
-            gfx.ellipse(c, x, H * 0.5f + W * 0.085f, W * 0.06f, W * 0.012f, 0x33000000);
-            drawIcon(c, show[i], x, y, W * 0.18f);
-        }
-        float m = 3 * u, hh = 11 * u;
-        drawCoinPill(c, W * 0.52f, topInset + m, W - m, topInset + m + hh, Math.round(dispCoins));
-        drawButtons(c);
-    }
-
-    private void drawLevels(Canvas c) {
-        float m = 3 * u;
-        gfx.textC(c, "Choose a Level", W / 2 + 3 * u, topInset + m + 6.5f * u, 7 * u, Color.WHITE, 0xFF1F5F10, Paint.Align.CENTER);
-        drawButtons(c);
-    }
-
-    private void drawPlay(Canvas c) {
-        float m = 3 * u, hh = 13 * u, hudTop = topInset + m;
-        // coin counter + moves
-        float mw = 27 * u;
-        drawCoinPill(c, m + hh + m * 0.8f + hh * 0.4f, hudTop, W - m - mw - m * 0.8f, hudTop + hh, Math.round(dispCoins));
-        float ml = W - m - mw, mr = W - m;
-        gfx.rrect(c, ml, hudTop + hh * 0.07f, mr, hudTop + hh * 1.07f, hh / 2, Gfx.darken(PANEL, 0.6f));
-        gfx.rrect(c, ml, hudTop, mr, hudTop + hh, hh / 2, PANEL);
-        gfx.rrectLine(c, ml + hh * 0.03f, hudTop + hh * 0.03f, mr - hh * 0.03f, hudTop + hh * 0.97f, hh / 2, hh * 0.06f, 0xFFC98A4B);
-        gfx.textC(c, "MOVES", (ml + mr) / 2, hudTop + hh * 0.26f, hh * 0.22f, 0xFFFFE8B0, 0xFF3A1F08, Paint.Align.CENTER);
-        gfx.textC(c, String.valueOf(movesLeft), (ml + mr) / 2, hudTop + hh * 0.66f, hh * 0.52f,
-                movesLeft <= 3 ? 0xFFFF7A66 : Color.WHITE, 0xFF3A1F08, Paint.Align.CENTER);
-
-        drawGoals(c);
-
-        // board
-        gfx.rrect(c, boardPanel.left, boardPanel.top + 1.2f * u, boardPanel.right, boardPanel.bottom + 1.2f * u, 4 * u, Gfx.darken(WOOD, 0.6f));
-        gfx.rrect(c, boardPanel.left, boardPanel.top, boardPanel.right, boardPanel.bottom, 4 * u, WOOD);
-        gfx.rrect(c, boardPanel.left + u * 0.7f, boardPanel.top + u * 0.7f, boardPanel.right - u * 0.7f, boardPanel.bottom - u * 0.7f, 3.4f * u, 0xFFE9CF93);
-        for (int r = 0; r < ROWS; r++) {
-            for (int col = 0; col < COLS; col++) {
-                float x = bx + col * cell, y = by + r * cell, g = cell * 0.04f;
-                gfx.rrect(c, x + g, y + g, x + cell - g, y + cell - g, cell * 0.2f, (r + col) % 2 == 0 ? 0xFFF8E7B4 : 0xFFF1DB9C);
-            }
-        }
-        if (board != null) {
-            c.save();
-            c.clipRect(bx, by, bx + cell * COLS, by + cell * ROWS);
-            if (selected != null) {
-                float x = bx + selected.c * cell, y = by + selected.r * cell, g = cell * 0.03f;
-                gfx.rrect(c, x + g, y + g, x + cell - g, y + cell - g, cell * 0.2f, 0x66FFFFFF);
-                gfx.rrectLine(c, x + g, y + g, x + cell - g, y + cell - g, cell * 0.2f, cell * 0.06f, 0xFFFFFFFF);
-            }
-            for (int r = 0; r < ROWS; r++) {
-                for (int col = 0; col < COLS; col++) {
-                    Tile t = board.g[r][col];
-                    if (t == null) continue;
-                    float extra = 1f;
-                    if (t == selected) extra = 1f + 0.07f * (float) Math.sin(time * 12);
-                    else if (hint != null && ((t.r == hint[0] && t.c == hint[1]) || (t.r == hint[2] && t.c == hint[3])))
-                        extra = 1f + 0.1f * (float) Math.sin(time * 8);
-                    if (t != fxTile) drawTile(c, t, extra);
-                }
-            }
-            if (fxTile != null && phase == Phase.CLEAR) {
-                drawFx(c);
-                drawTile(c, fxTile, 1f);
-            }
-            c.restore();
-        }
-
-        for (Particle p : particles) {
-            float a = p.life / p.max;
-            gfx.star(c, p.x, p.y, p.size * (0.5f + a), Gfx.alpha(p.color, a), 0);
-        }
-        for (Flyer f : flyers) {
-            if (f.delay > 0) continue;
-            float t = f.t * f.t * (3 - 2 * f.t);
-            float cpx = (f.sx + coinX) / 2 + (f.sx < W / 2 ? -1 : 1) * 10 * u;
-            float cpy = Math.min(f.sy, coinY) - 12 * u;
-            float x = (1 - t) * (1 - t) * f.sx + 2 * (1 - t) * t * cpx + t * t * coinX;
-            float y = (1 - t) * (1 - t) * f.sy + 2 * (1 - t) * t * cpy + t * t * coinY;
-            gfx.coin(c, x, y, cell * (0.3f - 0.12f * t));
-        }
-        for (Pop p : pops) {
-            float a = Math.min(1f, p.life / (p.max * 0.4f));
-            float s = 1f + 0.25f * (float) Math.sin(Math.min(1f, (p.max - p.life) * 6f) * Math.PI / 2);
-            gfx.textC(c, p.text, p.x, p.y, p.size * s, Gfx.alpha(p.color, a), Gfx.alpha(0xFF4A2808, a), Paint.Align.CENTER);
-        }
-
-        if (phase == Phase.BAG) {
-            drawBag(c);
-            drawButtons(c);
-        } else if (phase == Phase.TIP) drawTip(c);
-        else if (phase == Phase.END) drawEnd(c);
-        else drawButtons(c);
-    }
-
-    private void drawBag(Canvas c) {
-        float hh = 13 * u, hudTop = topInset + 3 * u;
-        float k = Math.max(0f, Math.min(1f, (bagT - BAG_PAUSE) / BAG_POP));
-        c.drawColor(Color.argb((int) (140 * k), 0, 0, 0));
-        // keep the counter bright above the dim layer
-        drawCoinPill(c, 3 * u + hh + 3 * u * 0.8f + hh * 0.4f, hudTop, W - 3 * u - 27 * u - 3 * u * 0.8f, hudTop + hh, Math.max(0, Math.round(dispCoins)));
-        if (k <= 0f) return;
-        float s = W * 0.55f, bagX = W / 2, bagY = H * 0.52f;
-        float ease = 1f + 2.70158f * (float) Math.pow(k - 1, 3) + 1.70158f * (float) Math.pow(k - 1, 2);
-        float sc = ease * (1f + 0.1f * bagBump);
-        float mouthY = bagY - 0.5f * s;
-        for (Flyer f : bagFlyers) {
-            if (f.delay > 0) continue;
-            float t = f.t * f.t;
-            float cpx = (coinX + bagX) / 2, cpy = Math.min(coinY, mouthY) - 14 * u;
-            float x = (1 - t) * (1 - t) * coinX + 2 * (1 - t) * t * cpx + t * t * bagX;
-            float y = (1 - t) * (1 - t) * coinY + 2 * (1 - t) * t * cpy + t * t * mouthY;
-            gfx.coin(c, x, y, cell * (0.34f - 0.1f * t));
-        }
-        float fillFrac = 1f - Math.max(0, landed) / (float) bagTotal;
-        c.save();
-        c.scale(sc, sc, bagX, bagY + 0.55f * s);
-        gfx.moneyBag(c, bagX, bagY, s, fillFrac);
-        c.restore();
-    }
-
-    private void drawGoals(Canvas c) {
-        RectF p = goalPanel;
-        gfx.rrect(c, p.left, p.top + u, p.right, p.bottom + u, 4 * u, Gfx.darken(WOOD, 0.7f));
-        gfx.rrect(c, p.left, p.top, p.right, p.bottom, 4 * u, WOOD);
-        gfx.rrect(c, p.left + u * 0.8f, p.top + u * 0.8f, p.right - u * 0.8f, p.bottom - u * 0.8f, 3.4f * u, CREAM);
-        if (level == null) return;
-        gfx.textC(c, "LEVEL " + level.number + " - HARVEST GOALS", p.centerX(), p.top + p.height() * 0.15f, 3.6f * u, 0xFF8B5A2B, 0, Paint.Align.CENTER);
-        int n = level.goalKinds.length;
-        float slot = (p.width() - 4 * u) / n;
-        for (int i = 0; i < n; i++) {
-            int kind = level.goalKinds[i];
-            float x = p.left + 2 * u + slot * (i + 0.5f);
-            float iy = p.top + p.height() * 0.5f;
-            float size = Math.min(slot * 0.8f, p.height() * 0.38f);
-            drawIcon(c, kind, x, iy, size);
-            if (need[kind] == 0) gfx.check(c, x + size * 0.38f, iy + size * 0.32f, size * 0.26f);
-            gfx.textC(c, need[kind] == 0 ? "Done!" : String.valueOf(need[kind]), x, p.top + p.height() * 0.84f, 5.4f * u,
-                    need[kind] == 0 ? 0xFF4CBB2C : Color.WHITE, need[kind] == 0 ? 0xFFFFFFFF : 0xFF8B5A2B, Paint.Align.CENTER);
-        }
-    }
-
-    private void drawTile(Canvas c, Tile t, float extra) {
-        float x = cx(t), y = cy(t);
-        boolean fx = t == fxTile && phase == Phase.CLEAR;
-        float rot = 0, mult = 1f, ox = 0, oy = 0;
-        if (fx) {
-            float k = clearTimer;
-            switch (t.type) {
-                case Art.SCARECROW:
-                    rot = k * 1000f;
-                    mult = 1.5f;
-                    break;
-                case Art.TNT:
-                    mult = 1f + 0.6f * Math.min(1f, k * 4f);
-                    ox = (float) Math.sin(k * 70) * cell * 0.03f;
-                    break;
-                case Art.GOLDEN_EGG:
-                    mult = 1.4f + 0.1f * (float) Math.sin(k * 20);
-                    gfx.circle(c, x, y, cell * (0.7f + 0.2f * (float) Math.sin(k * 18)), 0x66FFE066);
-                    break;
-                case Art.TRACTOR:
-                    if (k > 0.15f) return; // the tractor itself is driving across the board
-                    mult = 1f + k * 2f;
-                    break;
-            }
-        }
-        float size = cell * 0.92f * t.scale * extra * mult;
-        float w = size * (1f + 0.12f * t.squash), h = size * (1f - 0.18f * t.squash);
-        float bottom = y + oy + size / 2;
-        if (!fx) gfx.ellipse(c, x, y + cell * 0.38f, cell * 0.3f * t.scale, cell * 0.06f * t.scale, 0x26000000);
-        Bitmap b = art[t.type];
-        src.set(0, 0, b.getWidth(), b.getHeight());
-        dst.set(x + ox - w / 2, bottom - h, x + ox + w / 2, bottom);
-        c.save();
-        if (rot != 0) c.rotate(rot, x + ox, y + oy);
-        c.drawBitmap(b, src, dst, bmp);
-        c.restore();
-    }
-
-    /** Effects around the power-up that is currently being played. */
-    private void drawFx(Canvas c) {
-        float x = cx(fxTile), y = cy(fxTile), k = clearTimer;
-        switch (fxTile.type) {
-            case Art.GOLDEN_EGG:
-                for (Tile t : dying) {
-                    if (t == fxTile) continue;
-                    float a = 1f - (k - t.dyDelay) / 0.3f;
-                    if (k >= t.dyDelay - 0.05f && a > 0f)
-                        gfx.beam(c, x, y, cx(t), cy(t), cell * 0.14f * Math.min(1f, a), Gfx.alpha(0xFFFFD43B, Math.min(1f, a)));
-                }
-                gfx.circle(c, x, y, cell * (0.6f + k * 3f), Gfx.alpha(0xFFFFF3B0, Math.max(0f, 0.45f - k)));
-                break;
-            case Art.TNT: {
-                float a = Math.max(0f, 1f - k * 2.5f);
-                float rad = cell * (0.4f + k * 9f);
-                gfx.circle(c, x, y, rad * 0.85f, Gfx.alpha(0xFFFFE08A, a * 0.55f));
-                gfx.circleLine(c, x, y, rad, cell * 0.22f * a, Gfx.alpha(0xFFFF7A00, a));
-                break;
-            }
-            case Art.SCARECROW: {
-                float a = Math.max(0f, 1f - k * 2f);
-                for (int i = 0; i < 10; i++) {
-                    double ang = k * 14 + i * Math.PI / 5;
-                    float rr = cell * (0.5f + k * 5f);
-                    gfx.star(c, x + (float) Math.cos(ang) * rr, y + (float) Math.sin(ang) * rr, cell * 0.14f, Gfx.alpha(0xFFFFD25A, a), 0);
-                }
-                break;
-            }
-            case Art.TRACTOR: {
-                float tx = bx - cell * 0.5f + (k / 0.08f) * cell;
-                if (tx < bx + cell * (COLS + 1)) {
-                    float size = cell * 1.5f;
-                    Bitmap b = art[Art.TRACTOR];
-                    src.set(0, 0, b.getWidth(), b.getHeight());
-                    float bob = (float) Math.sin(k * 40) * cell * 0.02f;
-                    dst.set(tx - size / 2, y + cell * 0.45f - size + bob, tx + size / 2, y + cell * 0.45f + bob);
-                    gfx.ellipse(c, tx, y + cell * 0.45f, size * 0.4f, cell * 0.07f, 0x30000000);
-                    c.drawBitmap(b, src, dst, bmp);
-                }
-                break;
-            }
-        }
-    }
-
-    private static final String[] TIP_NAME = {"Scarecrow", "TNT", "Golden Egg", "Rainbow Tractor"};
-    private static final String[] TIP_USE = {
-            "Swap it with a neighbour and it spins, sweeping away the 3x3 area around it.",
-            "Swap it with a neighbour to blow up the 3x3 area around it.",
-            "Swap it with any crop to harvest every one of that crop on the board.",
-            "Swap it with any crop and it drives across the board, harvesting every one of that crop.",
-    };
-    private static final String[] TIP_MAKE = {
-            "Make one by matching a T or L shape.",
-            "Make one by matching a T or L shape.",
-            "Make one by matching 5 in a row.",
-            "Make one by matching 5 in a row.",
-    };
-
-    private List<String> wrap(String text, float size, float maxW) {
-        List<String> lines = new ArrayList<>();
-        StringBuilder cur = new StringBuilder();
-        for (String word : text.split(" ")) {
-            String next = cur.length() == 0 ? word : cur + " " + word;
-            if (cur.length() > 0 && gfx.width(next, size) > maxW) {
-                lines.add(cur.toString());
-                cur = new StringBuilder(word);
-            } else {
-                cur = new StringBuilder(next);
-            }
-        }
-        if (cur.length() > 0) lines.add(cur.toString());
-        return lines;
-    }
-
-    private void drawTip(Canvas c) {
-        c.drawColor(Color.argb((int) (150 * Math.min(1f, tipT * 4f)), 0, 0, 0));
-        float k = Math.min(1f, tipT * 2.5f);
-        float ease = 1f + 2.70158f * (float) Math.pow(k - 1, 3) + 1.70158f * (float) Math.pow(k - 1, 2);
-        c.save();
-        c.translate(0, (1f - ease) * -H * 0.25f * (k < 1 ? 1 : 0));
-        RectF o = tipBox;
-        float ph = o.height(), idx = tipType - Art.CROPS;
-        gfx.rrect(c, o.left, o.top + 1.5f * u, o.right, o.bottom + 1.5f * u, 6 * u, Gfx.darken(WOOD, 0.6f));
-        gfx.rrect(c, o.left, o.top, o.right, o.bottom, 6 * u, WOOD);
-        gfx.rrect(c, o.left + u, o.top + u, o.right - u, o.bottom - u, 5 * u, CREAM);
-        gfx.rrect(c, o.left - u, o.top - 3 * u, o.right + u, o.top + ph * 0.14f, 5 * u, ORANGE);
-        gfx.textC(c, "New Power-Up!", o.centerX(), o.top + ph * 0.045f, 7 * u, Color.WHITE, 0xFF7A3E0B, Paint.Align.CENTER);
-
-        float iy = o.top + ph * 0.30f, isz = W * 0.3f + 2 * u * (float) Math.sin(time * 4);
-        gfx.circle(c, o.centerX(), iy, isz * 0.62f, 0x55FFE066);
-        drawIcon(c, tipType, o.centerX(), iy, isz);
-        gfx.textC(c, TIP_NAME[(int) idx], o.centerX(), o.top + ph * 0.485f, 6.6f * u, 0xFFFFC928, 0xFF7A3E0B, Paint.Align.CENTER);
-
-        float maxW = o.width() - 12 * u, size = 4.4f * u, ly = o.top + ph * 0.56f;
-        for (String line : wrap(TIP_USE[(int) idx], size, maxW)) {
-            gfx.textC(c, line, o.centerX(), ly, size, 0xFF6B3F17, 0, Paint.Align.CENTER);
-            ly += size * 1.35f;
-        }
-        ly += size * 0.5f;
-        for (String line : wrap(TIP_MAKE[(int) idx], size, maxW)) {
-            gfx.textC(c, line, o.centerX(), ly, size, 0xFFD06A00, 0, Paint.Align.CENTER);
-            ly += size * 1.35f;
-        }
-        drawButtons(c);
-        c.restore();
-    }
-
-    private void drawEnd(Canvas c) {
-        float fade = Math.min(1f, overlayT * 4f);
-        c.drawColor(Color.argb((int) (150 * fade), 0, 0, 0));
-        float k = Math.min(1f, overlayT * 2.5f);
-        float ease = 1f + 2.70158f * (float) Math.pow(k - 1, 3) + 1.70158f * (float) Math.pow(k - 1, 2);
-        float dy = (1f - ease) * -H * 0.25f * (k < 1 ? 1 : 0);
-        c.save();
-        c.translate(0, dy);
-        RectF o = overlay;
-        float ph = o.height();
-        gfx.rrect(c, o.left, o.top + 1.5f * u, o.right, o.bottom + 1.5f * u, 6 * u, Gfx.darken(WOOD, 0.6f));
-        gfx.rrect(c, o.left, o.top, o.right, o.bottom, 6 * u, WOOD);
-        gfx.rrect(c, o.left + u, o.top + u, o.right - u, o.bottom - u, 5 * u, CREAM);
-        gfx.rrect(c, o.left - u, o.top - 4 * u, o.right + u, o.top + ph * 0.17f, 5 * u, won ? GREEN : 0xFFE5604A);
-        gfx.textC(c, won ? "Level Complete!" : "Out of Moves!", o.centerX(), o.top + ph * 0.06f, 7.2f * u, Color.WHITE, 0xFF2C4A14, Paint.Align.CENTER);
-
-        if (won) {
-            for (int i = 0; i < 3; i++) {
-                float sk = Math.max(0f, Math.min(1f, overlayT * 3f - 0.4f - i * 0.35f));
-                float x = o.centerX() + (i - 1) * 20 * u;
-                float y = o.top + ph * 0.3f - (i == 1 ? 3 * u : 0);
-                boolean on = i < stars;
-                float s = on ? 0.4f + 0.6f * sk : 1f;
-                gfx.star(c, x, y, 9.5f * u * s, on ? 0xFFFFD43B : 0xFFD8CBA8, on ? 0xFFC97700 : 0xFFB5A67E);
-            }
-        } else {
-            gfx.textC(c, "Give it another go, farmer!", o.centerX(), o.top + ph * 0.3f, 4.6f * u, 0xFF8B5A2B, 0, Paint.Align.CENTER);
-        }
-        String amount = "+" + coins;
-        float fs = 8 * u, tw = gfx.width(amount, fs);
-        float total = 10 * u + tw;
-        float sx = o.centerX() - total / 2;
-        gfx.coinPile(c, sx + 4.5f * u, o.top + ph * 0.46f, 5 * u);
-        gfx.textC(c, amount, sx + 10 * u, o.top + ph * 0.46f, fs, 0xFFFFC928, 0xFF7A3E0B, Paint.Align.LEFT);
-        if (won && bonus > 0) {
-            gfx.textC(c, "Moves bonus: " + bonus, o.centerX(), o.top + ph * 0.545f, 4.4f * u, 0xFF8B5A2B, 0, Paint.Align.CENTER);
-        }
-        drawButtons(c);
-        c.restore();
-    }
-
-    private void drawButtons(Canvas c) {
-        for (Button b : buttons) drawButton(c, b);
-    }
-
-    private void drawButton(Canvas c, Button b) {
-        float w = b.r.width(), h = b.r.height();
-        float depth = h * 0.09f;
-        float off = b.pressed ? depth * 0.8f : 0f;
-        int base = b.locked ? 0xFFA8A8A8 : b.color;
-        float cx = b.r.centerX(), cy = b.r.centerY();
-        if (b.circle) {
-            float rad = w / 2;
-            gfx.circle(c, cx, cy + depth, rad, Gfx.darken(base, 0.62f));
-            gfx.circle(c, cx, cy + off, rad, base);
-            gfx.circle(c, cx, cy + off, rad * 0.86f, Gfx.lighten(base, 0.18f));
-            gfx.ellipse(c, cx, cy + off - rad * 0.45f, rad * 0.55f, rad * 0.28f, 0x55FFFFFF);
-        } else {
-            float rad = h * 0.32f;
-            gfx.rrect(c, b.r.left, b.r.top + depth, b.r.right, b.r.bottom + depth, rad, Gfx.darken(base, 0.62f));
-            gfx.rrect(c, b.r.left, b.r.top + off, b.r.right, b.r.bottom + off, rad, base);
-            gfx.rrect(c, b.r.left + h * 0.08f, b.r.top + off + h * 0.07f, b.r.right - h * 0.08f, b.r.top + off + h * 0.45f, rad * 0.7f, 0x44FFFFFF);
-        }
-        if (b.back) gfx.backArrow(c, cx, cy + off, w * 0.5f);
-        else if (b.locked) gfx.lock(c, cx, cy + off, w * 0.26f);
-        else if (b.circle) {
-            boolean hasStars = b.stars >= 0;
-            gfx.textC(c, b.text, cx, cy + off - (hasStars ? w * 0.06f : 0), w * 0.42f, Color.WHITE, Gfx.darken(base, 0.45f), Paint.Align.CENTER);
-            if (hasStars) {
-                for (int i = 0; i < 3; i++) {
-                    boolean on = i < b.stars;
-                    gfx.star(c, cx + (i - 1) * w * 0.22f, cy + off + w * 0.31f - (i == 1 ? 0 : w * 0.03f), w * 0.1f,
-                            on ? 0xFFFFD43B : 0xFF7A8F60, on ? 0xFFC97700 : 0xFF4E5E3C);
-                }
-            }
-        } else {
-            gfx.textC(c, b.text, cx, cy + off, h * 0.42f, Color.WHITE, Gfx.darken(base, 0.45f), Paint.Align.CENTER);
-        }
-    }
 }

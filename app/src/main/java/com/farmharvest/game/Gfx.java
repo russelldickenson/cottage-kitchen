@@ -9,6 +9,8 @@ import android.graphics.Typeface;
 
 /** Cartoon drawing helpers: outlined text, chunky panels, coins, stars. */
 final class Gfx {
+    static final int GREEN = 0xFF5BC236, ORANGE = 0xFFFF9B26, BLUE = 0xFF3FA9F5, PANEL = 0xFF6B3F17;
+    static final int CREAM = 0xFFFFF4D2, WOOD = 0xFF8B5A2B;
     static final int GOLD = 0xFFFFC928;
     static final int GOLD_DARK = 0xFFC97700;
     static final int INK = 0xFF5A3410;

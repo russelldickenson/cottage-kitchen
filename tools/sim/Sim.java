@@ -3,12 +3,12 @@ package com.farmharvest.game;
 import java.util.*;
 
 /**
- * Headless level simulator. Mirrors the clear/spawn/activation rules in GameView and plays every
+ * Headless level simulator. Uses the same Rules and Board code as the game and plays every
  * level with bots of different skill so level goals and move limits can be tuned from data.
  * Run: tools/sim/run.sh [games-per-level]
  */
 public class Sim {
-    static final int COLS = 7, ROWS = 8;
+    static final int COLS = Rules.COLS, ROWS = Rules.ROWS;
     static final Random rnd = new Random(42);
     static int madeByMove, madeByCascade, activated;
     static boolean counting;
@@ -66,7 +66,7 @@ public class Sim {
         List<Tile> spT = new ArrayList<>();
         List<Integer> spTy = new ArrayList<>();
         if (Art.isSpecial(a.type) || Art.isSpecial(t2.type)) {
-            clear = special(b, a, t2);
+            clear = Rules.specialClearSet(b, a, t2);
             if (counting) activated++;
             counted.addAll(clear);
         } else {
@@ -102,65 +102,18 @@ public class Sim {
     }
 
     static Set<Tile> fromRuns(List<Board.Run> runs, Tile sa, Tile sb, Set<Tile> counted, List<Tile> spT, List<Integer> spTy) {
-        for (Board.Run run : runs) {
-            if (NO_SPECIALS || run.tiles.size() < 5) continue;
-            Tile at = run.tiles.contains(sa) ? sa : run.tiles.contains(sb) ? sb : run.tiles.get(run.tiles.size() / 2);
-            if (!spT.contains(at)) {
-                if (counting && sa == null && sb == null) madeByCascade++;
-                else if (counting) madeByMove++;
-                spT.add(at);
-                spTy.add(rnd.nextBoolean() ? Art.GOLDEN_EGG : Art.TRACTOR);
-            }
-        }
-        for (Board.Run h : runs) {
-            if (NO_SPECIALS || !h.horizontal) continue;
-            for (Board.Run v : runs) {
-                if (v.horizontal || v.type != h.type) continue;
-                for (Tile t : h.tiles) {
-                    if (v.tiles.contains(t)) {
-                        if (!spT.contains(t)) {
-                            if (counting && sa == null && sb == null) madeByCascade++;
-                            else if (counting) madeByMove++;
-                            spT.add(t);
-                            spTy.add(rnd.nextBoolean() ? Art.TNT : Art.SCARECROW);
-                        }
-                        break;
-                    }
-                }
-            }
+        Rules.Spawns sp = Rules.findSpawns(runs, sa, sb, rnd);
+        for (int i = 0; i < sp.tiles.size(); i++) {
+            if (NO_SPECIALS) break;
+            spT.add(sp.tiles.get(i));
+            spTy.add(sp.types.get(i));
+            if (counting && sa == null && sb == null) madeByCascade++;
+            else if (counting) madeByMove++;
         }
         for (Board.Run run : runs) counted.addAll(run.tiles);
         Set<Tile> clear = new LinkedHashSet<>(counted);
         clear.removeAll(spT);
         return clear;
-    }
-
-    static Set<Tile> special(Board b, Tile a, Tile t2) {
-        boolean ac = Art.isColor(a.type), bc = Art.isColor(t2.type);
-        boolean as = Art.isSpecial(a.type), bs = Art.isSpecial(t2.type);
-        Set<Tile> set = new LinkedHashSet<>();
-        if ((ac || bc) && as && bs) {
-            for (Tile[] row : b.g) for (Tile t : row) if (t != null) set.add(t);
-        } else if (ac || bc) {
-            Tile act = ac ? a : t2, other = ac ? t2 : a;
-            for (Tile[] row : b.g) for (Tile t : row) if (t != null && t.type == other.type) set.add(t);
-            set.add(act);
-        } else {
-            ArrayDeque<Tile> q = new ArrayDeque<>();
-            for (Tile t : new Tile[]{a, t2}) if (Art.isBomb(t.type) && set.add(t)) q.add(t);
-            while (!q.isEmpty()) {
-                Tile t = q.poll();
-                for (int dr = -1; dr <= 1; dr++) {
-                    for (int dc = -1; dc <= 1; dc++) {
-                        int nr = t.r + dr, nc = t.c + dc;
-                        if (nr < 0 || nc < 0 || nr >= ROWS || nc >= COLS) continue;
-                        Tile n = b.g[nr][nc];
-                        if (n != null && set.add(n) && Art.isBomb(n.type)) q.add(n);
-                    }
-                }
-            }
-        }
-        return set;
     }
 
     /** skill: 1.0 always plays the best goal move, 0.0 plays a random legal move. Returns moves left, or -1 on a loss. */
