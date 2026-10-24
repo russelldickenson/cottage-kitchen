@@ -1,0 +1,28 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Platform SDK only: no AndroidX, no third-party dependencies.
+android {
+    namespace 'com.farmharvest.game'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'com.farmharvest.game'
+        minSdk 24
+        targetSdk 36
+        versionCode 1
+        versionName '1.0'
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
