@@ -10,6 +10,9 @@ import java.util.*;
 public class Sim {
     static final int COLS = 7, ROWS = 8;
     static final Random rnd = new Random(42);
+    static int madeByMove, madeByCascade, activated;
+    static boolean counting;
+    static final boolean NO_SPECIALS = Boolean.getBoolean("nospecials");
 
     static final class State {
         int[] need = new int[Art.COUNT];
@@ -64,6 +67,7 @@ public class Sim {
         List<Integer> spTy = new ArrayList<>();
         if (Art.isSpecial(a.type) || Art.isSpecial(t2.type)) {
             clear = special(b, a, t2);
+            if (counting) activated++;
             counted.addAll(clear);
         } else {
             List<Board.Run> runs = b.findRuns();
@@ -99,20 +103,24 @@ public class Sim {
 
     static Set<Tile> fromRuns(List<Board.Run> runs, Tile sa, Tile sb, Set<Tile> counted, List<Tile> spT, List<Integer> spTy) {
         for (Board.Run run : runs) {
-            if (run.tiles.size() < 5) continue;
+            if (NO_SPECIALS || run.tiles.size() < 5) continue;
             Tile at = run.tiles.contains(sa) ? sa : run.tiles.contains(sb) ? sb : run.tiles.get(run.tiles.size() / 2);
             if (!spT.contains(at)) {
+                if (counting && sa == null && sb == null) madeByCascade++;
+                else if (counting) madeByMove++;
                 spT.add(at);
                 spTy.add(rnd.nextBoolean() ? Art.GOLDEN_EGG : Art.TRACTOR);
             }
         }
         for (Board.Run h : runs) {
-            if (!h.horizontal) continue;
+            if (NO_SPECIALS || !h.horizontal) continue;
             for (Board.Run v : runs) {
                 if (v.horizontal || v.type != h.type) continue;
                 for (Tile t : h.tiles) {
                     if (v.tiles.contains(t)) {
                         if (!spT.contains(t)) {
+                            if (counting && sa == null && sb == null) madeByCascade++;
+                            else if (counting) madeByMove++;
                             spT.add(t);
                             spTy.add(rnd.nextBoolean() ? Art.TNT : Art.SCARECROW);
                         }
@@ -178,7 +186,9 @@ public class Sim {
                     }
                 }
             }
+            counting = true;
             play(b, s, pick, true);
+            counting = false;
         }
         return s.done() ? s.moves : -1;
     }
@@ -192,6 +202,16 @@ public class Sim {
     }
 
     public static void main(String[] args) {
+        if (args.length > 1 && args[1].equals("stats")) {
+            int games = Integer.parseInt(args[0]);
+            System.out.println("level  moves  power-ups made by player move / by cascade / used   (per game, expert bot)");
+            for (int i = 0; i < Level.COUNT; i++) {
+                madeByMove = madeByCascade = activated = 0;
+                for (int g = 0; g < games; g++) playLevel(Level.get(i), 1.0);
+                System.out.printf("%5d  %5d  %6.2f / %6.2f / %6.2f%n", i + 1, Level.get(i).moves, (double) madeByMove / games, (double) madeByCascade / games, (double) activated / games);
+            }
+            return;
+        }
         if (args.length > 1 && args[1].equals("tune")) {
             int games = Integer.parseInt(args[0]);
             StringBuilder sm = new StringBuilder(), ss = new StringBuilder();

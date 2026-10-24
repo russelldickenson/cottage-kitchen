@@ -28,7 +28,7 @@ import java.util.Set;
 public class GameView extends View {
     private enum Screen {TITLE, LEVELS, PLAY}
 
-    private enum Phase {IDLE, SWAP, SWAPBACK, CLEAR, FALL, BAG, END}
+    private enum Phase {IDLE, SWAP, SWAPBACK, CLEAR, FALL, BAG, TIP, END}
 
     private static final int COLS = 7, ROWS = 8;
     private static final float SWAP_SPEED = 9f, GRAVITY = 45f, CLEAR_TIME = 0.28f;
@@ -83,13 +83,15 @@ public class GameView extends View {
     private Tile fxTile;
     private float clearDuration = CLEAR_TIME;
     private static final float BAG_PAUSE = 1f, BAG_POP = 0.35f, BAG_FLY = 0.5f;
-    private float bagT, bagBump, bagEndT;
+    private float bagT, bagBump, bagEndT, tipT;
+    private int pendingTip = -1, tipType;
+    private final boolean[] tipSeen = new boolean[Art.COUNT];
     private int bagTotal;
 
     // layout
     private float W, H, topInset, botInset, u;
     private float bx, by, cell, coinX, coinY, coinR;
-    private final RectF boardPanel = new RectF(), goalPanel = new RectF(), overlay = new RectF();
+    private final RectF boardPanel = new RectF(), goalPanel = new RectF(), overlay = new RectF(), tipBox = new RectF();
 
     // persistent progress
     private int unlocked, totalCoins;
@@ -120,6 +122,7 @@ public class GameView extends View {
         for (int i = 0; i < Art.COUNT; i++) art[i] = BitmapFactory.decodeResource(getResources(), Art.RES[i], o);
         unlocked = Math.max(1, prefs.getInt("unlocked", 1));
         totalCoins = prefs.getInt("coins", 0);
+        for (int t = Art.CROPS; t < Art.COUNT; t++) tipSeen[t] = prefs.getBoolean("tip_" + t, false);
         for (int i = 0; i < Level.COUNT; i++) bestStars[i] = prefs.getInt("stars_" + i, 0);
         setOnApplyWindowInsetsListener((v, insets) -> {
             topInset = insets.getSystemWindowInsetTop();
@@ -173,6 +176,7 @@ public class GameView extends View {
         by = top + Math.min((availH - bh) / 2, 2 * u);
         boardPanel.set(bx - pad, by - pad, bx + bw + pad, by + bh + pad);
         overlay.set(W * 0.08f, H * 0.2f, W * 0.92f, H * 0.8f);
+        tipBox.set(W * 0.1f, H * 0.22f, W * 0.9f, H * 0.78f);
         coinR = hh * 0.5f;
         coinX = m + hh + m * 0.8f + hh * 0.6f;
         coinY = hudTop + hh / 2;
@@ -207,6 +211,14 @@ public class GameView extends View {
                 if (!b.locked) b.act = () -> startLevel(idx);
                 buttons.add(b);
             }
+        } else if (phase == Phase.TIP) {
+            addWide(tipBox.centerX(), tipBox.top + tipBox.height() * 0.9f, tipBox.width() * 0.6f, tipBox.height() * 0.11f, "GOT IT!", GREEN, () -> {
+                tipSeen[tipType] = true;
+                prefs.edit().putBoolean("tip_" + tipType, true).apply();
+                phase = Phase.IDLE;
+                idleTime = 0;
+                buildButtons();
+            });
         } else if (phase == Phase.END) {
             float pw = overlay.width(), ph = overlay.height(), bh = ph * 0.11f;
             float cx = overlay.centerX();
@@ -287,6 +299,7 @@ public class GameView extends View {
         pops.clear();
         dying.clear();
         bagFlyers.clear();
+        pendingTip = -1;
         for (int r = 0; r < ROWS; r++) {
             for (int c = 0; c < COLS; c++) board.g[r][c].y = r - ROWS - rnd.nextFloat() * 1.5f - (COLS - c) * 0.1f;
         }
@@ -422,6 +435,9 @@ public class GameView extends View {
                         buildButtons();
                     }
                 }
+                break;
+            case TIP:
+                tipT += dt;
                 break;
             case END:
                 overlayT += dt;
@@ -630,6 +646,7 @@ public class GameView extends View {
         for (int i = 0; i < spawnTiles.size(); i++) {
             Tile t = spawnTiles.get(i);
             t.type = spawnTypes.get(i);
+            if (!tipSeen[t.type] && pendingTip < 0) pendingTip = t.type;
             t.scale = 0f;
             sparkle(cx(t), cy(t));
             sparkle(cx(t), cy(t));
@@ -663,6 +680,13 @@ public class GameView extends View {
             phase = Phase.IDLE;
             idleTime = 0;
             hint = null;
+            if (pendingTip >= 0) {
+                tipType = pendingTip;
+                pendingTip = -1;
+                tipT = 0;
+                phase = Phase.TIP;
+                buildButtons();
+            }
         }
     }
 
@@ -967,7 +991,8 @@ public class GameView extends View {
         if (phase == Phase.BAG) {
             drawBag(c);
             drawButtons(c);
-        } else if (phase == Phase.END) drawEnd(c);
+        } else if (phase == Phase.TIP) drawTip(c);
+        else if (phase == Phase.END) drawEnd(c);
         else drawButtons(c);
     }
 
@@ -1099,6 +1124,69 @@ public class GameView extends View {
                 break;
             }
         }
+    }
+
+    private static final String[] TIP_NAME = {"Scarecrow", "TNT", "Golden Egg", "Rainbow Tractor"};
+    private static final String[] TIP_USE = {
+            "Swap it with a neighbour and it spins, sweeping away the 3x3 area around it.",
+            "Swap it with a neighbour to blow up the 3x3 area around it.",
+            "Swap it with any crop to harvest every one of that crop on the board.",
+            "Swap it with any crop and it drives across the board, harvesting every one of that crop.",
+    };
+    private static final String[] TIP_MAKE = {
+            "Make one by matching a T or L shape.",
+            "Make one by matching a T or L shape.",
+            "Make one by matching 5 in a row.",
+            "Make one by matching 5 in a row.",
+    };
+
+    private List<String> wrap(String text, float size, float maxW) {
+        List<String> lines = new ArrayList<>();
+        StringBuilder cur = new StringBuilder();
+        for (String word : text.split(" ")) {
+            String next = cur.length() == 0 ? word : cur + " " + word;
+            if (cur.length() > 0 && gfx.width(next, size) > maxW) {
+                lines.add(cur.toString());
+                cur = new StringBuilder(word);
+            } else {
+                cur = new StringBuilder(next);
+            }
+        }
+        if (cur.length() > 0) lines.add(cur.toString());
+        return lines;
+    }
+
+    private void drawTip(Canvas c) {
+        c.drawColor(Color.argb((int) (150 * Math.min(1f, tipT * 4f)), 0, 0, 0));
+        float k = Math.min(1f, tipT * 2.5f);
+        float ease = 1f + 2.70158f * (float) Math.pow(k - 1, 3) + 1.70158f * (float) Math.pow(k - 1, 2);
+        c.save();
+        c.translate(0, (1f - ease) * -H * 0.25f * (k < 1 ? 1 : 0));
+        RectF o = tipBox;
+        float ph = o.height(), idx = tipType - Art.CROPS;
+        gfx.rrect(c, o.left, o.top + 1.5f * u, o.right, o.bottom + 1.5f * u, 6 * u, Gfx.darken(WOOD, 0.6f));
+        gfx.rrect(c, o.left, o.top, o.right, o.bottom, 6 * u, WOOD);
+        gfx.rrect(c, o.left + u, o.top + u, o.right - u, o.bottom - u, 5 * u, CREAM);
+        gfx.rrect(c, o.left - u, o.top - 3 * u, o.right + u, o.top + ph * 0.14f, 5 * u, ORANGE);
+        gfx.textC(c, "New Power-Up!", o.centerX(), o.top + ph * 0.045f, 7 * u, Color.WHITE, 0xFF7A3E0B, Paint.Align.CENTER);
+
+        float iy = o.top + ph * 0.30f, isz = W * 0.3f + 2 * u * (float) Math.sin(time * 4);
+        gfx.circle(c, o.centerX(), iy, isz * 0.62f, 0x55FFE066);
+        drawIcon(c, tipType, o.centerX(), iy, isz);
+        gfx.textC(c, TIP_NAME[(int) idx], o.centerX(), o.top + ph * 0.485f, 6.6f * u, 0xFFFFC928, 0xFF7A3E0B, Paint.Align.CENTER);
+
+        float maxW = o.width() - 12 * u, size = 4.4f * u, ly = o.top + ph * 0.56f;
+        for (String line : wrap(TIP_USE[(int) idx], size, maxW)) {
+            gfx.textC(c, line, o.centerX(), ly, size, 0xFF6B3F17, 0, Paint.Align.CENTER);
+            ly += size * 1.35f;
+        }
+        ly += size * 0.5f;
+        for (String line : wrap(TIP_MAKE[(int) idx], size, maxW)) {
+            gfx.textC(c, line, o.centerX(), ly, size, 0xFFD06A00, 0, Paint.Align.CENTER);
+            ly += size * 1.35f;
+        }
+        drawButtons(c);
+        c.restore();
     }
 
     private void drawEnd(Canvas c) {
