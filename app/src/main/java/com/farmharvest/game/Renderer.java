@@ -78,6 +78,7 @@ final class Renderer {
         else if (v.screen == Screen.FARM) farm.drawFarm(c);
         else if (v.screen == Screen.MARKET) farm.drawMarket(c);
         else if (v.screen == Screen.SHOP) farm.drawShop(c);
+        else if (v.screen == Screen.ORDERS) farm.drawOrders(c);
         else if (v.screen == Screen.LEVELS) drawLevels(c);
         else drawPlay(c);
     }

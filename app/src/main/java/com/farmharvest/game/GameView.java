@@ -19,7 +19,7 @@ import java.util.Set;
 
 /** Owns the game state, runs the match-3 state machine and handles touch input. Drawing is in Renderer. */
 public class GameView extends View {
-    enum Screen {TITLE, LEVELS, PLAY, FARM, MARKET, SHOP}
+    enum Screen {TITLE, LEVELS, PLAY, FARM, MARKET, SHOP, ORDERS}
 
     enum Phase {IDLE, SWAP, SWAPBACK, CLEAR, FALL, BAG, TIP, END}
 
@@ -159,7 +159,7 @@ public class GameView extends View {
             addSpeaker(m, topInset + m, hh);
             addWide(W / 2, H * 0.62f + 8.5f * u, W * 0.6f, 17 * u, "PLAY", GREEN, this::goLevels);
             addWide(W / 2, H * 0.62f + 17 * u + 4 * u + 7.5f * u, W * 0.6f, 15 * u, "MY FARM", ORANGE, () -> goScreen(Screen.FARM));
-        } else if (screen == Screen.FARM || screen == Screen.MARKET || screen == Screen.SHOP) {
+        } else if (screen == Screen.FARM || screen == Screen.MARKET || screen == Screen.SHOP || screen == Screen.ORDERS) {
             hub.build(screen);
         } else if (screen == Screen.LEVELS) {
             addBack(m, topInset + m, hh, this::goTitle);
@@ -290,7 +290,7 @@ public class GameView extends View {
             }
             return true;
         }
-        if (screen == Screen.MARKET || screen == Screen.SHOP) {
+        if (screen == Screen.MARKET || screen == Screen.SHOP || screen == Screen.ORDERS) {
             goScreen(Screen.FARM);
             return true;
         }
@@ -317,6 +317,7 @@ public class GameView extends View {
         phase = Phase.IDLE;
         confirmQuit = false;
         hammerMode = false;
+        if (s == Screen.FARM || s == Screen.ORDERS) progress.refreshOrders(Farm.today());
         hub.open();
         buildButtons();
     }

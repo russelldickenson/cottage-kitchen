@@ -26,6 +26,9 @@ final class Farm {
     static final int BASE_CAPACITY = 200, CAPACITY_STEP = 100;
     static final float SELL_BONUS_STEP = 0.10f;
 
+    // daily gift
+    static final int GIFT_COINS = 150;
+
     static int maxLevel(int building) {
         return UPGRADE_COST[building].length;
     }

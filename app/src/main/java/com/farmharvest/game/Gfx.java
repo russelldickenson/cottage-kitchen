@@ -316,6 +316,12 @@ final class Gfx {
         }
     }
 
+    void clipCircle(Canvas c, float cx, float cy, float r) {
+        path.reset();
+        path.addCircle(cx, cy, r, Path.Direction.CW);
+        c.clipPath(path);
+    }
+
     void backArrow(Canvas c, float cx, float cy, float r) {
         line.setColor(Color.WHITE);
         line.setStrokeWidth(r * 0.3f);

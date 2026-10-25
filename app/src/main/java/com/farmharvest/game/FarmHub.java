@@ -15,7 +15,7 @@ import java.util.List;
 
 /** Layout, state and buttons for the farm, market and general store screens. Drawing is in FarmRenderer. */
 final class FarmHub {
-    static final int BARN = 0, WELL = 1, PLOT = 2, MARKET = 3, STORE = 4, BUILDINGS = 5;
+    static final int BARN = 0, WELL = 1, PLOT = 2, MARKET = 3, STORE = 4, ORDERS = 5, BUILDINGS = 6;
 
     private final GameView v;
 
@@ -35,6 +35,12 @@ final class FarmHub {
     final RectF[] shopRow = new RectF[Farm.BOOSTERS];
     final Button[] shopBuy = new Button[Farm.BOOSTERS];
 
+    // orders
+    final Button[] fillBtn = new Button[Orders.SLOTS];
+    Button giftBtn;
+    float giftTop, giftH, ordersTop;
+    static final float CARD_H = 46f, CARD_GAP = 3f;
+
     FarmHub(GameView v) {
         this.v = v;
         for (int i = 0; i < BUILDINGS; i++) tile[i] = new RectF();
@@ -53,7 +59,8 @@ final class FarmHub {
         place(MARKET, rx, ay, tw, th);
         place(WELL, lx, ay + rowH3, tw, th);
         place(PLOT, rx, ay + rowH3, tw, th);
-        place(STORE, mx, ay + 2 * rowH3, tw, th);
+        place(STORE, lx, ay + 2 * rowH3, tw, th);
+        place(ORDERS, rx, ay + 2 * rowH3, tw, th);
 
         cardBox.set(v.W * 0.08f, v.H * 0.2f, v.W * 0.92f, v.H * 0.8f);
 
@@ -62,6 +69,10 @@ final class FarmHub {
         rowTop0 = bannerTop + bannerH + 3 * u;
         rowH = 10.5f * u;
         rowGap = 1.5f * u;
+
+        giftTop = titleY + 7 * u;
+        giftH = 12 * u;
+        ordersTop = giftTop + giftH + 3 * u;
 
         float sy = titleY + 9 * u;
         for (int k = 0; k < shopRow.length; k++) shopRow[k].set(m, sy + k * 30 * u, v.W - m, sy + k * 30 * u + 27 * u);
@@ -74,6 +85,22 @@ final class FarmHub {
     RectF marketRow(int i) {
         float m = 3 * v.u, top = rowTop0 + i * (rowH + rowGap);
         return new RectF(m, top, v.W - m, top + rowH);
+    }
+
+    RectF orderCard(int s) {
+        float m = 3 * v.u, top = ordersTop + s * (CARD_H + CARD_GAP) * v.u;
+        return new RectF(m, top, v.W - m, top + CARD_H * v.u);
+    }
+
+    RectF fillRect(int s) {
+        RectF c = orderCard(s);
+        float u = v.u;
+        return new RectF(c.right - 31 * u, c.top + 33.5f * u, c.right - 3 * u, c.top + 44.5f * u);
+    }
+
+    RectF giftChip() {
+        float u = v.u, m = 3 * u;
+        return new RectF(v.W - m - 32 * u, giftTop + 1.8f * u, v.W - m - 2.5f * u, giftTop + giftH - 1.8f * u);
     }
 
     RectF buyChip(int k) {
@@ -98,6 +125,13 @@ final class FarmHub {
                 final int id = i;
                 bld[i] = v.addHit(tile[i], () -> tapBuilding(id));
             }
+        } else if (s == Screen.ORDERS) {
+            v.addBack(m, v.topInset + m, hh, () -> v.goScreen(Screen.FARM));
+            for (int k = 0; k < Orders.SLOTS; k++) {
+                final int slot = k;
+                fillBtn[k] = v.progress.orders[k].has ? v.addHit(fillRect(k), () -> fill(slot)) : null;
+            }
+            giftBtn = v.progress.giftReady(Farm.today()) ? v.addHit(giftChip(), this::claimGift) : null;
         } else if (s == Screen.MARKET) {
             v.addBack(m, v.topInset + m, hh, () -> v.goScreen(Screen.FARM));
             buildMarket();
@@ -111,7 +145,9 @@ final class FarmHub {
     }
 
     private void tapBuilding(int id) {
-        if (id == MARKET) {
+        if (id == ORDERS) {
+            v.goScreen(Screen.ORDERS);
+        } else if (id == MARKET) {
             v.goScreen(Screen.MARKET);
         } else if (id == STORE) {
             v.goScreen(Screen.SHOP);
@@ -190,6 +226,33 @@ final class FarmHub {
         v.sfx.haptic(15, 90);
         v.fx.pop("+" + value, x, y, 7 * v.u, 1.1f, 0xFFFFD43B, v.W * 0.8f);
         for (int i = 0; i < 3; i++) v.fx.sparkle(x + (i - 1) * 14 * v.u, y, v.u, v.cell);
+    }
+
+    // ---------------------------------------------------------------- orders
+
+    private void fill(int slot) {
+        RectF c = orderCard(slot);
+        int reward = v.progress.fillOrder(slot, Farm.today());
+        if (reward > 0) {
+            v.sfx.powerUpMade();
+            v.sfx.coin();
+            v.fx.pop("+" + reward, c.centerX(), c.centerY(), 8 * v.u, 1.2f, 0xFFFFD43B, v.W * 0.8f);
+            for (int i = 0; i < 3; i++) v.fx.sparkle(c.centerX() + (i - 1) * 16 * v.u, c.centerY(), v.u, v.cell);
+            v.buildButtons();
+        } else {
+            v.sfx.badSwap();
+            v.fx.pop("Not enough crops yet", c.centerX(), c.centerY(), 5.5f * v.u, 1f, 0xFFFF7A66, v.W * 0.8f);
+        }
+    }
+
+    private void claimGift() {
+        int booster = v.progress.claimGift(Farm.today());
+        v.sfx.powerUpMade();
+        v.sfx.coin();
+        float y = giftTop + giftH / 2;
+        v.fx.pop("+" + Farm.GIFT_COINS + (booster >= 0 ? " and a " + Farm.BOOSTER_NAME[booster] + "!" : ""), v.W / 2, y + 10 * v.u, 6 * v.u, 1.4f, 0xFFFFD43B, v.W * 0.9f);
+        for (int i = 0; i < 3; i++) v.fx.sparkle(v.W * (0.25f + 0.25f * i), y, v.u, v.cell);
+        v.buildButtons();
     }
 
     // ---------------------------------------------------------------- store

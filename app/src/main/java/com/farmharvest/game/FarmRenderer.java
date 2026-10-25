@@ -17,6 +17,10 @@ final class FarmRenderer {
     private static final int OUT = 0xFF3E2008, INK = 0xFF6B3F17, PRICE_BAD = 0xFFFF9A8A;
     static final int[] BOOSTER_COLOR = {ORANGE, BLUE, GREEN};
 
+    private static final String[] PLATE = {"Barn", "Well", "Scarecrow Plot", "Market", "General Store", "Orders"};
+    private static final int[] SKIN = {0xFFF2C9A0, 0xFFF5D7B7, 0xFFC68642, 0xFFF2C9A0, 0xFFE0A878, 0xFFF5D7B7, 0xFFE0A878, 0xFFC68642};
+    private static final int[] CLOTHES = {0xFF5BC236, 0xFFE5604A, 0xFFFFD43B, 0xFFF08A24, 0xFFE91E63, 0xFF3FA9F5, 0xFF9B59B6, 0xFF2C3E50};
+
     private final GameView v;
     private final Renderer r;
     private final Gfx gfx;
@@ -77,6 +81,9 @@ final class FarmRenderer {
             case FarmHub.PLOT:
                 plot(c, cx, cy, s);
                 break;
+            case FarmHub.ORDERS:
+                notice(c, cx, cy, s);
+                break;
             case FarmHub.MARKET:
                 market(c, cx, cy, s);
                 break;
@@ -94,11 +101,20 @@ final class FarmRenderer {
         float artCy = t.top + s * 0.5f + off;
         gfx.ellipse(c, cx, artCy + s * 0.44f, s * 0.52f, s * 0.08f, 0x30000000);
         art(c, id, cx, artCy, s);
+        if (id == FarmHub.ORDERS) {
+            int n = v.progress.fillableOrders() + (v.progress.giftReady(Farm.today()) ? 1 : 0);
+            if (n > 0) {
+                float bx = cx + s * 0.42f, by = artCy - s * 0.4f, br = s * 0.13f;
+                gfx.circle(c, bx, by, br, 0xFFE5304A);
+                gfx.circleLine(c, bx, by, br, s * 0.025f, Color.WHITE);
+                gfx.textC(c, String.valueOf(n), bx, by, br * 1.35f, Color.WHITE, 0, Paint.Align.CENTER);
+            }
+        }
 
         float plateTop = t.top + s * 1.04f, plateH = 7 * u, pw = t.width() * 0.92f;
         gfx.rrect(c, cx - pw / 2, plateTop + 0.7f * u, cx + pw / 2, plateTop + plateH + 0.7f * u, 2 * u, Gfx.darken(WOOD, 0.6f));
         gfx.rrect(c, cx - pw / 2, plateTop, cx + pw / 2, plateTop + plateH, 2 * u, WOOD);
-        gfx.textC(c, Farm.BUILDING_NAME.length > id ? Farm.BUILDING_NAME[id] : id == FarmHub.MARKET ? "Market" : "General Store",
+        gfx.textC(c, PLATE[id],
                 cx, plateTop + plateH / 2, 4.6f * u, Color.WHITE, 0xFF3A1F08, Paint.Align.CENTER);
 
         float y1 = plateTop + plateH + 4.2f * u, y2 = y1 + 4.6f * u, y3 = y2 + 5.4f * u;
@@ -122,6 +138,12 @@ final class FarmRenderer {
             int worth = p.sellValueAll(Farm.today());
             if (worth > 0) priceChip(c, cx, y2 + 1.4f * u, worth, true, 4.4f * u);
             else gfx.textC(c, "Barn is empty", cx, y2 + 1.4f * u, 3.7f * u, 0xFF8B5A2B, 0, Paint.Align.CENTER);
+        } else if (id == FarmHub.ORDERS) {
+            int open = p.openOrders(), ready = p.fillableOrders();
+            gfx.textC(c, open + (open == 1 ? " open order" : " open orders"), cx, y1, 3.7f * u, INK, 0, Paint.Align.CENTER);
+            if (ready > 0) gfx.textC(c, ready + " ready to fill!", cx, y2 + 1.4f * u, 4.2f * u, 0xFF3E9E22, 0xFFFFFFFF, Paint.Align.CENTER);
+            else if (p.giftReady(Farm.today())) gfx.textC(c, "Daily gift waiting!", cx, y2 + 1.4f * u, 4.2f * u, 0xFFD06A00, 0xFFFFFFFF, Paint.Align.CENTER);
+            else gfx.textC(c, "Check back soon", cx, y2 + 1.4f * u, 3.7f * u, 0xFF8B5A2B, 0, Paint.Align.CENTER);
         } else {
             gfx.textC(c, "Boosters", cx, y1, 3.7f * u, INK, 0, Paint.Align.CENTER);
             int owned = p.boosters[0] + p.boosters[1] + p.boosters[2];
@@ -320,5 +342,133 @@ final class FarmRenderer {
         gfx.textC(c, "during a level. Tap one to use it!", v.W / 2, ty + 5.5f * u, 4f * u, Color.WHITE, 0xFF1F5F10, Paint.Align.CENTER);
         effects(c);
         r.drawButtons(c);
+    }
+
+    // ---------------------------------------------------------------- orders
+
+    private void notice(Canvas c, float cx, float cy, float s) {
+        gfx.rrect(c, cx - 0.3f * s, cy - 0.05f * s, cx - 0.24f * s, cy + 0.42f * s, 0.01f * s, 0xFF8B5A2B);
+        gfx.rrect(c, cx + 0.24f * s, cy - 0.05f * s, cx + 0.3f * s, cy + 0.42f * s, 0.01f * s, 0xFF8B5A2B);
+        gfx.rrect(c, cx - 0.44f * s, cy - 0.4f * s, cx + 0.44f * s, cy + 0.16f * s, 0.04f * s, 0xFFB5793B);
+        gfx.rrectLine(c, cx - 0.44f * s, cy - 0.4f * s, cx + 0.44f * s, cy + 0.16f * s, 0.04f * s, 0.03f * s, OUT);
+        int[] paper = {0xFFFFF4D2, 0xFFFFE9A8, 0xFFFFD9D2};
+        float[] px = {-0.25f, 0f, 0.26f}, rot = {-6, 4, -3};
+        for (int k = 0; k < 3; k++) {
+            float x = cx + px[k] * s, y = cy - 0.12f * s;
+            c.save();
+            c.rotate(rot[k], x, y);
+            gfx.rrect(c, x - 0.1f * s, y - 0.15f * s, x + 0.1f * s, y + 0.15f * s, 0.015f * s, paper[k]);
+            gfx.rrectLine(c, x - 0.1f * s, y - 0.15f * s, x + 0.1f * s, y + 0.15f * s, 0.015f * s, 0.012f * s, 0xFF8B5A2B);
+            for (int l = 0; l < 3; l++) gfx.lineSeg(c, x - 0.065f * s, y - 0.05f * s + l * 0.06f * s, x + 0.065f * s, y - 0.05f * s + l * 0.06f * s, 0.012f * s, 0xFF8A7A5A);
+            gfx.circle(c, x, y - 0.145f * s, 0.024f * s, 0xFFE5304A);
+            c.restore();
+        }
+    }
+
+    /** A customer's face, drawn in code: a bust with either a hat or hair. */
+    private void customer(Canvas c, int id, float cx, float cy, float r) {
+        id = Math.floorMod(id, SKIN.length);
+        c.save();
+        gfx.clipCircle(c, cx, cy, r);
+        gfx.circle(c, cx, cy, r, 0xFFCFEBA8);
+        gfx.ellipse(c, cx, cy + r * 0.82f, r * 0.78f, r * 0.42f, CLOTHES[id]);
+        gfx.circle(c, cx, cy + r * 0.02f, r * 0.52f, SKIN[id]);
+        if (id % 2 == 0) {
+            int hc = CLOTHES[(id + 3) % CLOTHES.length];
+            gfx.ellipse(c, cx, cy - r * 0.3f, r * 0.46f, r * 0.32f, hc);
+            gfx.rrect(c, cx - r * 0.72f, cy - r * 0.34f, cx + r * 0.72f, cy - r * 0.22f, r * 0.06f, Gfx.darken(hc, 0.85f));
+        } else {
+            gfx.ellipse(c, cx, cy - r * 0.27f, r * 0.55f, r * 0.34f, id == 1 ? 0xFFDADADA : 0xFF7A4E26);
+        }
+        gfx.circle(c, cx - r * 0.19f, cy + r * 0.02f, r * 0.07f, OUT);
+        gfx.circle(c, cx + r * 0.19f, cy + r * 0.02f, r * 0.07f, OUT);
+        gfx.circle(c, cx - r * 0.31f, cy + r * 0.2f, r * 0.1f, 0x66FF7A7A);
+        gfx.circle(c, cx + r * 0.31f, cy + r * 0.2f, r * 0.1f, 0x66FF7A7A);
+        gfx.ellipse(c, cx, cy + r * 0.26f, r * 0.16f, r * 0.08f, 0xFF8A3A2A);
+        c.restore();
+        gfx.circleLine(c, cx, cy, r, r * 0.07f, 0xFF8B5A2B);
+    }
+
+    void drawOrders(Canvas c) {
+        header(c, "Orders");
+        FarmHub h = v.hub;
+        Progress p = v.progress;
+        float u = v.u, m = 3 * u;
+        long day = Farm.today();
+
+        // daily gift banner
+        float gt = h.giftTop, gb = gt + h.giftH, gy = (gt + gb) / 2;
+        gfx.rrect(c, m, gt + 0.8f * u, v.W - m, gb + 0.8f * u, 3 * u, Gfx.darken(WOOD, 0.6f));
+        gfx.rrect(c, m, gt, v.W - m, gb, 3 * u, WOOD);
+        gfx.rrect(c, m + 0.6f * u, gt + 0.6f * u, v.W - m - 0.6f * u, gb - 0.6f * u, 2.5f * u, 0xFFFFE9A8);
+        float gx = m + 7 * u;
+        gfx.rrect(c, gx - 3.4f * u, gy - 2f * u, gx + 3.4f * u, gy + 3.8f * u, 0.6f * u, 0xFFE5604A);
+        gfx.rrect(c, gx - 4.2f * u, gy - 4f * u, gx + 4.2f * u, gy - 1.4f * u, 0.6f * u, 0xFFD9453A);
+        gfx.rrect(c, gx - 0.8f * u, gy - 4f * u, gx + 0.8f * u, gy + 3.8f * u, 0.3f * u, 0xFFFFD43B);
+        boolean ready = p.giftReady(day);
+        gfx.textC(c, ready ? "Daily gift is ready!" : "Daily gift claimed", m + 14 * u, gy - 2.2f * u, 4.6f * u, INK, 0, Paint.Align.LEFT);
+        gfx.textC(c, ready ? "+" + Farm.GIFT_COINS + " coins, bonus every 3rd day" : "Come back tomorrow!", m + 14 * u, gy + 2.6f * u, 3.0f * u, 0xFF8B5A2B, 0, Paint.Align.LEFT);
+        if (ready) {
+            RectF chip = h.giftChip();
+            boolean pressed = h.giftBtn != null && h.giftBtn.pressed;
+            float off = pressed ? 0.6f * u : 0f;
+            gfx.rrect(c, chip.left, chip.top + 0.8f * u, chip.right, chip.bottom + 0.8f * u, chip.height() * 0.4f, Gfx.darken(GREEN, 0.62f));
+            gfx.rrect(c, chip.left, chip.top + off, chip.right, chip.bottom + off, chip.height() * 0.4f, GREEN);
+            gfx.textC(c, "CLAIM", chip.centerX(), chip.centerY() + off, 4.6f * u, Color.WHITE, Gfx.darken(GREEN, 0.45f), Paint.Align.CENTER);
+        }
+
+        for (int slot = 0; slot < Orders.SLOTS; slot++) drawOrderCard(c, slot, day);
+        effects(c);
+        r.drawButtons(c);
+    }
+
+    private void drawOrderCard(Canvas c, int slot, long day) {
+        FarmHub h = v.hub;
+        Progress p = v.progress;
+        Orders.Order o = p.orders[slot];
+        RectF cd = h.orderCard(slot);
+        float u = v.u;
+        gfx.rrect(c, cd.left, cd.top + 1f * u, cd.right, cd.bottom + 1f * u, 4 * u, Gfx.darken(WOOD, 0.6f));
+        gfx.rrect(c, cd.left, cd.top, cd.right, cd.bottom, 4 * u, WOOD);
+        gfx.rrect(c, cd.left + 0.7f * u, cd.top + 0.7f * u, cd.right - 0.7f * u, cd.bottom - 0.7f * u, 3.4f * u, CREAM);
+        if (!o.has) {
+            gfx.textC(c, "No order right now", cd.centerX(), cd.centerY() - 3 * u, 5.4f * u, INK, 0, Paint.Align.CENTER);
+            gfx.textC(c, "A new customer arrives tomorrow.", cd.centerX(), cd.centerY() + 3.5f * u, 3.8f * u, 0xFF8B5A2B, 0, Paint.Align.CENTER);
+            return;
+        }
+        customer(c, o.customer, cd.left + 10.5f * u, cd.top + 10 * u, 7.5f * u);
+        gfx.textC(c, Orders.CUSTOMER[o.customer], cd.left + 20 * u, cd.top + 7 * u, 4.8f * u, INK, 0, Paint.Align.LEFT);
+        int dl = Orders.daysLeft(o, day);
+        gfx.textC(c, dl <= 1 ? "Last day!" : dl + " days left", cd.right - 3.5f * u, cd.top + 7 * u, 3.8f * u, dl <= 1 ? 0xFFD9453A : 0xFF8B5A2B, 0, Paint.Align.RIGHT);
+        gfx.textC(c, "wants:", cd.left + 20 * u, cd.top + 12.5f * u, 3.4f * u, 0xFF8B5A2B, 0, Paint.Align.LEFT);
+
+        for (int k = 0; k < o.n; k++) {
+            float ix = cd.left + 4 * u + k * 22 * u + 10.5f * u;
+            int have = p.barn[o.type[k]];
+            r.drawIcon(c, o.type[k], ix, cd.top + 22.5f * u, 10 * u);
+            boolean enough = have >= o.qty[k];
+            gfx.textC(c, Math.min(have, 999) + "/" + o.qty[k], ix, cd.top + 30.2f * u, 4f * u, enough ? 0xFF3E9E22 : 0xFFD9453A, 0, Paint.Align.CENTER);
+        }
+
+        float ry = cd.top + 39 * u;
+        gfx.coin(c, cd.left + 6 * u, ry, 2.7f * u);
+        String reward = "+" + o.reward;
+        gfx.textC(c, reward, cd.left + 10 * u, ry, 5.6f * u, 0xFFFFC928, 0xFF7A3E0B, Paint.Align.LEFT);
+        if (o.gift >= 0) {
+            float bx = cd.left + 10 * u + gfx.width(reward, 5.6f * u) + 6 * u;
+            gfx.circle(c, bx, ry, 3.3f * u, BOOSTER_COLOR[o.gift]);
+            gfx.circleLine(c, bx, ry, 3.3f * u, 0.4f * u, Gfx.darken(BOOSTER_COLOR[o.gift], 0.6f));
+            gfx.boosterIcon(c, o.gift, bx, ry, 2.1f * u);
+            gfx.textC(c, "+1", bx + 5.2f * u, ry, 4f * u, INK, 0, Paint.Align.LEFT);
+        }
+
+        RectF f = h.fillRect(slot);
+        boolean ok = p.canFill(slot);
+        boolean pressed = h.fillBtn[slot] != null && h.fillBtn[slot].pressed;
+        float off = pressed ? 0.6f * u : 0f, fh = f.height();
+        int base = ok ? GREEN : 0xFFA8A8A8;
+        gfx.rrect(c, f.left, f.top + 0.9f * u, f.right, f.bottom + 0.9f * u, fh * 0.4f, Gfx.darken(base, 0.62f));
+        gfx.rrect(c, f.left, f.top + off, f.right, f.bottom + off, fh * 0.4f, base);
+        gfx.textC(c, "FILL", f.centerX(), f.centerY() + off, 5f * u, Color.WHITE, Gfx.darken(base, 0.45f), Paint.Align.CENTER);
     }
 }
