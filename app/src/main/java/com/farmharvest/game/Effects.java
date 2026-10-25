@@ -148,7 +148,8 @@ final class Effects {
         p.y = y;
         p.text = text;
         float tw = gfx.width(text, size);
-        p.size = tw > maxWidth ? size * maxWidth / tw : size;
+        float fit = maxWidth / 1.3f; // pops swell by up to 1.25x when they appear
+        p.size = tw > fit ? size * fit / tw : size;
         p.life = p.max = life;
         p.color = color;
         pops.add(p);

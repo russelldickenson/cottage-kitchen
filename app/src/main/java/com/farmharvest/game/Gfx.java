@@ -270,6 +270,52 @@ final class Gfx {
         }
     }
 
+    /** Filled polygon with an outline. pts is x0,y0,x1,y1,... */
+    void polygon(Canvas c, int fillColor, int lineColor, float lineW, float... pts) {
+        path.reset();
+        path.moveTo(pts[0], pts[1]);
+        for (int i = 2; i < pts.length; i += 2) path.lineTo(pts[i], pts[i + 1]);
+        path.close();
+        fill.setColor(fillColor);
+        c.drawPath(path, fill);
+        if (lineW > 0) {
+            line.setColor(lineColor);
+            line.setStrokeWidth(lineW);
+            c.drawPath(path, line);
+        }
+    }
+
+    void lineSeg(Canvas c, float x1, float y1, float x2, float y2, float w, int color) {
+        line.setColor(color);
+        line.setStrokeWidth(w);
+        c.drawLine(x1, y1, x2, y2, line);
+    }
+
+    /** White booster glyphs: extra moves, shuffle, hammer. r is roughly the icon radius. */
+    void boosterIcon(Canvas c, int kind, float cx, float cy, float r) {
+        switch (kind) {
+            case Farm.MOVES:
+                text(c, "+5", cx, cy + r * 0.38f, r * 1.25f, Color.WHITE, 0xFF3A1F08, Paint.Align.CENTER);
+                break;
+            case Farm.SHUFFLE: {
+                float w = r * 0.2f;
+                lineSeg(c, cx - r * 0.65f, cy - r * 0.45f, cx + r * 0.6f, cy + r * 0.45f, w, Color.WHITE);
+                lineSeg(c, cx - r * 0.65f, cy + r * 0.45f, cx + r * 0.6f, cy - r * 0.45f, w, Color.WHITE);
+                polygon(c, Color.WHITE, Color.WHITE, w * 0.3f, cx + r * 0.85f, cy + r * 0.6f, cx + r * 0.35f, cy + r * 0.6f, cx + r * 0.6f, cy + r * 0.15f);
+                polygon(c, Color.WHITE, Color.WHITE, w * 0.3f, cx + r * 0.85f, cy - r * 0.6f, cx + r * 0.35f, cy - r * 0.6f, cx + r * 0.6f, cy - r * 0.15f);
+                break;
+            }
+            default: {
+                c.save();
+                c.rotate(-40, cx, cy);
+                rrect(c, cx - r * 0.12f, cy - r * 0.1f, cx + r * 0.12f, cy + r * 0.95f, r * 0.08f, 0xFF8B5A2B);
+                rrect(c, cx - r * 0.6f, cy - r * 0.7f, cx + r * 0.6f, cy - r * 0.02f, r * 0.14f, 0xFFD9D9D9);
+                rrectLine(c, cx - r * 0.6f, cy - r * 0.7f, cx + r * 0.6f, cy - r * 0.02f, r * 0.14f, r * 0.08f, 0xFF4A4A4A);
+                c.restore();
+            }
+        }
+    }
+
     void backArrow(Canvas c, float cx, float cy, float r) {
         line.setColor(Color.WHITE);
         line.setStrokeWidth(r * 0.3f);

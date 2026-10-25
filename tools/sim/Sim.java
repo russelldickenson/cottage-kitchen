@@ -12,6 +12,7 @@ public class Sim {
     static final Random rnd = new Random(42);
     static int madeByMove, madeByCascade, activated;
     static boolean counting;
+    static long harvestedTiles, harvestedValue;
     static final boolean NO_SPECIALS = Boolean.getBoolean("nospecials");
 
     static final class State {
@@ -81,6 +82,10 @@ public class Sim {
         double gain = 0;
         while (true) {
             for (Tile t : counted) {
+                if (counting && t.type < Art.CROPS) {
+                    harvestedTiles++;
+                    harvestedValue += Farm.BASE_PRICE[t.type];
+                }
                 if (t.type < Art.CROPS && s.need[t.type] > 0) {
                     s.need[t.type]--;
                     gain += 1;
@@ -155,6 +160,33 @@ public class Sim {
     }
 
     public static void main(String[] args) {
+        if (args.length > 1 && args[1].equals("economy")) {
+            int games = Integer.parseInt(args[0]);
+            long cum = 0;
+            System.out.println("level moves | crops harvested | crop sale value | level coins | income per win | cumulative   (expert, base prices)");
+            for (int i = 0; i < Level.COUNT; i++) {
+                Level lv = Level.get(i);
+                harvestedTiles = harvestedValue = 0;
+                long movesLeftSum = 0;
+                int wins = 0;
+                for (int g = 0; g < games; g++) {
+                    int r = playLevel(lv, 1.0);
+                    if (r >= 0) {
+                        wins++;
+                        movesLeftSum += r;
+                    }
+                }
+                double crops = (double) harvestedTiles / games, sale = (double) harvestedValue / games;
+                double coins = crops * 10 + (wins == 0 ? 0 : 30.0 * movesLeftSum / wins);
+                double income = sale + coins;
+                cum += Math.round(income);
+                System.out.printf("%5d %5d | %15.1f | %15.0f | %11.0f | %14.0f | %d%n", i + 1, lv.moves, crops, sale, coins, income, cum);
+            }
+            int total = 0;
+            for (int b = 0; b < Farm.UPGRADES; b++) for (int c : Farm.UPGRADE_COST[b]) total += c;
+            System.out.println("All upgrades together cost " + total + " coins.");
+            return;
+        }
         if (args.length > 1 && args[1].equals("stats")) {
             int games = Integer.parseInt(args[0]);
             System.out.println("level  moves  power-ups made by player move / by cascade / used   (per game, expert bot)");

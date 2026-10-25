@@ -39,6 +39,7 @@ final class Renderer {
     private final Paint sky = new Paint();
     private final Paint plain = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path hill1 = new Path(), hill2 = new Path();
+    final FarmRenderer farm;
     private final Rect src = new Rect();
     private final RectF dst = new RectF();
 
@@ -46,6 +47,7 @@ final class Renderer {
         this.v = v;
         this.gfx = gfx;
         this.fx = fx;
+        this.farm = new FarmRenderer(v, this, gfx);
         BitmapFactory.Options o = new BitmapFactory.Options();
         o.inScaled = false;
         for (int i = 0; i < Art.COUNT; i++) art[i] = BitmapFactory.decodeResource(ctx.getResources(), Art.RES[i], o);
@@ -73,6 +75,9 @@ final class Renderer {
     void draw(Canvas c) {
         drawBackground(c);
         if (v.screen == Screen.TITLE) drawTitle(c);
+        else if (v.screen == Screen.FARM) farm.drawFarm(c);
+        else if (v.screen == Screen.MARKET) farm.drawMarket(c);
+        else if (v.screen == Screen.SHOP) farm.drawShop(c);
         else if (v.screen == Screen.LEVELS) drawLevels(c);
         else drawPlay(c);
     }
@@ -95,14 +100,14 @@ final class Renderer {
         c.drawPath(hill2, plain);
     }
 
-    private void drawIcon(Canvas c, int type, float cx, float cy, float size) {
+    void drawIcon(Canvas c, int type, float cx, float cy, float size) {
         Bitmap b = art[type];
         src.set(0, 0, b.getWidth(), b.getHeight());
         dst.set(cx - size / 2, cy - size / 2, cx + size / 2, cy + size / 2);
         c.drawBitmap(b, src, dst, bmp);
     }
 
-    private void drawCoinPill(Canvas c, float l, float t, float r, float b, int value) {
+    void drawCoinPill(Canvas c, float l, float t, float r, float b, int value) {
         float h = b - t;
         gfx.rrect(c, l, t + h * 0.07f, r, b + h * 0.07f, h / 2, Gfx.darken(PANEL, 0.6f));
         gfx.rrect(c, l, t, r, b, h / 2, PANEL);
@@ -117,9 +122,9 @@ final class Renderer {
 
     private void drawTitle(Canvas c) {
         c.save();
-        c.rotate(-4, v.W / 2, v.H * 0.2f);
-        gfx.text(c, "Farm", v.W / 2, v.H * 0.2f, v.W * 0.24f, 0xFFFFD43B, 0xFF7A3E0B, Paint.Align.CENTER);
-        gfx.text(c, "Harvest", v.W / 2, v.H * 0.2f + v.W * 0.2f, v.W * 0.2f, 0xFF7ED957, 0xFF1F5F10, Paint.Align.CENTER);
+        c.rotate(-4, v.W / 2, v.H * 0.27f);
+        gfx.text(c, "Farm", v.W / 2, v.H * 0.27f, v.W * 0.24f, 0xFFFFD43B, 0xFF7A3E0B, Paint.Align.CENTER);
+        gfx.text(c, "Harvest", v.W / 2, v.H * 0.27f + v.W * 0.2f, v.W * 0.2f, 0xFF7ED957, 0xFF1F5F10, Paint.Align.CENTER);
         c.restore();
         int[] show = {1, 0, 5, 4, 2};
         for (int i = 0; i < show.length; i++) {
@@ -461,15 +466,41 @@ final class Renderer {
         if (v.won && v.bonus > 0) {
             gfx.textC(c, "Moves bonus: " + v.bonus, o.centerX(), o.top + ph * 0.545f, 4.4f * v.u, 0xFF8B5A2B, 0, Paint.Align.CENTER);
         }
+        gfx.textC(c, "Barn: +" + v.harvestStored + " crops", o.centerX(), o.top + ph * 0.60f, 4.4f * v.u, 0xFF3E9E22, 0, Paint.Align.CENTER);
+        if (v.harvestOverflow > 0) {
+            gfx.textC(c, "Barn full! Extra sold: +" + v.harvestOverflow, o.centerX(), o.top + ph * 0.65f, 3.8f * v.u, 0xFFD06A00, 0, Paint.Align.CENTER);
+        }
         drawButtons(c);
         c.restore();
     }
 
-    private void drawButtons(Canvas c) {
+    /** Glyph, owned-count badge or price, and a pulsing ring while the hammer is armed. */
+    private void drawBoosterButton(Canvas c, Button b, float cx, float cy, float w) {
+        int k = b.icon, owned = v.progress.boosters[k];
+        gfx.boosterIcon(c, k, cx, cy, w * 0.3f);
+        if (k == Farm.HAMMER && v.hammerMode) {
+            gfx.circleLine(c, cx, cy, w * (0.58f + 0.04f * (float) Math.sin(v.time * 10)), w * 0.07f, 0xFFFFFFFF);
+        }
+        if (owned > 0) {
+            float bx = cx + w * 0.38f, by = cy - w * 0.38f, br = w * 0.2f;
+            gfx.circle(c, bx, by, br, 0xFFE5304A);
+            gfx.circleLine(c, bx, by, br, w * 0.04f, 0xFFFFFFFF);
+            gfx.textC(c, String.valueOf(owned), bx, by, br * 1.3f, Color.WHITE, 0, Paint.Align.CENTER);
+        } else {
+            float py = cy + w * 0.5f + v.u * 3.4f, size = v.u * 3.6f;
+            String s = String.valueOf(Farm.BOOSTER_PRICE[k]);
+            float tw = gfx.width(s, size), cr = size * 0.55f, x = cx - (cr * 2 + size * 0.25f + tw) / 2;
+            gfx.coin(c, x + cr, py, cr);
+            gfx.textC(c, s, x + cr * 2 + size * 0.25f, py, size, v.progress.totalCoins >= Farm.BOOSTER_PRICE[k] ? Color.WHITE : 0xFFFF9A8A, 0xFF3A1F08, Paint.Align.LEFT);
+        }
+    }
+
+    void drawButtons(Canvas c) {
         for (Button b : v.buttons) drawButton(c, b);
     }
 
     private void drawButton(Canvas c, Button b) {
+        if (b.hidden) return;
         float w = b.r.width(), h = b.r.height();
         float depth = h * 0.09f;
         float off = b.pressed ? depth * 0.8f : 0f;
@@ -487,7 +518,8 @@ final class Renderer {
             gfx.rrect(c, b.r.left, b.r.top + off, b.r.right, b.r.bottom + off, rad, base);
             gfx.rrect(c, b.r.left + h * 0.08f, b.r.top + off + h * 0.07f, b.r.right - h * 0.08f, b.r.top + off + h * 0.45f, rad * 0.7f, 0x44FFFFFF);
         }
-        if (b.back) gfx.backArrow(c, cx, cy + off, w * 0.5f);
+        if (b.icon >= 0) drawBoosterButton(c, b, cx, cy + off, w);
+        else if (b.back) gfx.backArrow(c, cx, cy + off, w * 0.5f);
         else if (b.speaker) gfx.speaker(c, cx, cy + off, w * 0.42f, b.muted);
         else if (b.locked) gfx.lock(c, cx, cy + off, w * 0.26f);
         else if (b.circle) {
