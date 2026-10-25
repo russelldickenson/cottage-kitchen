@@ -506,7 +506,7 @@ public class GameView extends View {
         clearDuration = CLEAR_TIME;
         fxTile = null;
         dying.clear();
-        spawns = Rules.findSpawns(runs, swapA, swapB, rnd);
+        spawns = level.powerUps() ? Rules.findSpawns(runs, swapA, swapB, rnd) : new Rules.Spawns();
         sfx.match(combo);
         swapA = swapB = null;
 
@@ -672,6 +672,7 @@ public class GameView extends View {
 
     /** The Scarecrow Plot upgrade scatters power-ups on the board at the start of a level. */
     private void placeStartingPowerUps() {
+        if (!level.powerUps()) return;
         int n = Farm.startingPowerUps(progress.building[Farm.PLOT]);
         boolean[][] used = new boolean[ROWS][COLS];
         while (n > 0) {

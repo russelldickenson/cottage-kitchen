@@ -4,6 +4,9 @@ package com.farmharvest.game;
 final class Level {
     static final int COUNT = 15;
 
+    /** Power-up tiles (Golden Egg, Tractor, TNT, Scarecrow) only appear from this level number. */
+    static final int POWER_UP_LEVEL = 8;
+
     /**
      * Per-level tuning, produced by tools/sim/run.sh (tune): the base goal count per crop and the move budget.
      * Budgets ramp from ~14 to ~25 moves while goals grow to fit what a skilled player can harvest in that time.
@@ -23,6 +26,10 @@ final class Level {
         this.goalKinds = goalKinds;
         this.goalCounts = goalCounts;
         this.moves = moves;
+    }
+
+    boolean powerUps() {
+        return number >= POWER_UP_LEVEL;
     }
 
     static Level get(int index) {

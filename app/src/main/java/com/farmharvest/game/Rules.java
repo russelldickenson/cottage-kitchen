@@ -10,7 +10,8 @@ import java.util.Set;
 /** Pure match-3 rules shared by the game and the level simulator. No Android types in here. */
 final class Rules {
     static final int COLS = 7, ROWS = 8;
-    static final int MOVE_BONUS = 30;
+    // Coin rewards. Crops sold at the market are the main income; these are the pocket money.
+    static final int TILE_COINS = 4, LONG_RUN_BONUS = 6, SPECIAL_TILE_COINS = 5, MOVE_BONUS = 10;
 
     /** Power-up tiles a clear should leave behind. */
     static final class Spawns {
@@ -52,12 +53,12 @@ final class Rules {
 
     /** Coins for one matched run. */
     static int runCoins(int length, int combo) {
-        return (length * 10 + Math.max(0, length - 3) * 15) * combo;
+        return (length * TILE_COINS + Math.max(0, length - 3) * LONG_RUN_BONUS) * combo;
     }
 
     /** Coins for a power-up clear of the given number of tiles. */
     static int specialCoins(int tiles, int combo) {
-        return tiles * 12 * combo;
+        return tiles * SPECIAL_TILE_COINS * combo;
     }
 
     /** Which of the two swapped tiles is the power-up that plays (colour-clearers outrank bombs). */

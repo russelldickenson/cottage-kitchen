@@ -19,9 +19,9 @@ final class Farm {
     static final int BARN = 0, WELL = 1, PLOT = 2, UPGRADES = 3;
     static final String[] BUILDING_NAME = {"Barn", "Well", "Scarecrow Plot"};
     static final int[][] UPGRADE_COST = {
-            {1200, 2500, 5000, 8000},
-            {1500, 3000, 5500, 9000, 13000},
-            {3000, 7000, 14000},
+            {1200, 2500, 5000, 7000},
+            {1500, 3000, 5000, 7500, 10000},
+            {3000, 6500, 11000},
     };
     static final int BASE_CAPACITY = 200, CAPACITY_STEP = 100;
     static final float SELL_BONUS_STEP = 0.10f;
@@ -51,7 +51,7 @@ final class Farm {
             case WELL:
                 return level == 0 ? "Normal sell prices" : "+" + Math.round(SELL_BONUS_STEP * 100 * level) + "% sell prices";
             default:
-                return level == 0 ? "No head start" : "Start with " + level + " power-up" + (level > 1 ? "s" : "");
+                return level == 0 ? "No head start" : level + " power-up" + (level > 1 ? "s" : "") + " (Lv " + Level.POWER_UP_LEVEL + "+)";
         }
     }
 

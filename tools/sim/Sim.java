@@ -12,7 +12,9 @@ public class Sim {
     static final Random rnd = new Random(42);
     static int madeByMove, madeByCascade, activated;
     static boolean counting;
+    static boolean powerUpsOn = true;
     static long harvestedTiles, harvestedValue;
+    static long levelCoins;
     static final boolean NO_SPECIALS = Boolean.getBoolean("nospecials");
 
     static final class State {
@@ -66,16 +68,19 @@ public class Sim {
         Set<Tile> counted = new LinkedHashSet<>(), clear;
         List<Tile> spT = new ArrayList<>();
         List<Integer> spTy = new ArrayList<>();
+        int combo = 1;
         if (Art.isSpecial(a.type) || Art.isSpecial(t2.type)) {
             clear = Rules.specialClearSet(b, a, t2);
             if (counting) activated++;
             counted.addAll(clear);
+            if (counting) levelCoins += Rules.specialCoins(clear.size(), combo);
         } else {
             List<Board.Run> runs = b.findRuns();
             if (runs.isEmpty()) {
                 b.swap(m[0], m[1], m[2], m[3]);
                 return -1;
             }
+            if (counting) for (Board.Run r : runs) levelCoins += Rules.runCoins(r.tiles.size(), combo);
             clear = fromRuns(runs, a, t2, counted, spT, spTy);
         }
         s.moves--;
@@ -98,6 +103,8 @@ public class Sim {
             if (!full) return gain;
             List<Board.Run> runs = b.findRuns();
             if (runs.isEmpty()) break;
+            combo++;
+            if (counting) for (Board.Run r : runs) levelCoins += Rules.runCoins(r.tiles.size(), combo);
             counted = new LinkedHashSet<>();
             spT = new ArrayList<>();
             spTy = new ArrayList<>();
@@ -109,7 +116,7 @@ public class Sim {
     static Set<Tile> fromRuns(List<Board.Run> runs, Tile sa, Tile sb, Set<Tile> counted, List<Tile> spT, List<Integer> spTy) {
         Rules.Spawns sp = Rules.findSpawns(runs, sa, sb, rnd);
         for (int i = 0; i < sp.tiles.size(); i++) {
-            if (NO_SPECIALS) break;
+            if (NO_SPECIALS || !powerUpsOn) break;
             spT.add(sp.tiles.get(i));
             spTy.add(sp.types.get(i));
             if (counting && sa == null && sb == null) madeByCascade++;
@@ -123,6 +130,7 @@ public class Sim {
 
     /** skill: 1.0 always plays the best goal move, 0.0 plays a random legal move. Returns moves left, or -1 on a loss. */
     static int playLevel(Level lv, double skill) {
+        powerUpsOn = lv.powerUps();
         Board b = new Board(COLS, ROWS, lv.kinds, rnd);
         State s = new State();
         for (int i = 0; i < lv.goalKinds.length; i++) s.need[lv.goalKinds[i]] = lv.goalCounts[i];
@@ -166,7 +174,7 @@ public class Sim {
             System.out.println("level moves | crops harvested | crop sale value | level coins | income per win | cumulative   (expert, base prices)");
             for (int i = 0; i < Level.COUNT; i++) {
                 Level lv = Level.get(i);
-                harvestedTiles = harvestedValue = 0;
+                harvestedTiles = harvestedValue = levelCoins = 0;
                 long movesLeftSum = 0;
                 int wins = 0;
                 for (int g = 0; g < games; g++) {
@@ -177,7 +185,7 @@ public class Sim {
                     }
                 }
                 double crops = (double) harvestedTiles / games, sale = (double) harvestedValue / games;
-                double coins = crops * 10 + (wins == 0 ? 0 : 30.0 * movesLeftSum / wins);
+                double coins = (double) levelCoins / games + (wins == 0 ? 0 : (double) Rules.MOVE_BONUS * movesLeftSum / wins);
                 double income = sale + coins;
                 cum += Math.round(income);
                 System.out.printf("%5d %5d | %15.1f | %15.0f | %11.0f | %14.0f | %d%n", i + 1, lv.moves, crops, sale, coins, income, cum);
