@@ -19,9 +19,9 @@ import java.util.Set;
 
 /** Owns the game state, runs the match-3 state machine and handles touch input. Drawing is in Renderer. */
 public class GameView extends View {
-    enum Screen {TITLE, LEVELS, PLAY, FARM, MARKET, SHOP, ORDERS}
+    enum Screen {TITLE, LEVELS, PLAY, FARM, SHOP}
 
-    enum Phase {IDLE, SWAP, SWAPBACK, CLEAR, FALL, BAG, TIP, END}
+    enum Phase {IDLE, SWAP, SWAPBACK, CLEAR, FALL, BAG, TIP}
 
     static final int COLS = Rules.COLS, ROWS = Rules.ROWS;
     private static final float SWAP_SPEED = 9f, GRAVITY = 45f, CLEAR_TIME = 0.28f;
@@ -58,14 +58,15 @@ public class GameView extends View {
     int pendingTip = -1, tipType;
     int bagTotal;
     int[] harvest = new int[Art.CROPS];
-    int harvestStored, harvestOverflow;
+    /** This level's payout, split up for the result banner on the farm screen. */
+    int playCoins, saleCoins, farmPct;
     boolean hammerMode;
     final RectF[] boosterRect = {new RectF(), new RectF(), new RectF()};
 
     // layout
     float W, H, topInset, botInset, u;
     float bx, by, cell, coinX, coinY, coinR;
-    final RectF boardPanel = new RectF(), goalPanel = new RectF(), overlay = new RectF(), tipBox = new RectF(), confirmBox = new RectF();
+    final RectF boardPanel = new RectF(), goalPanel = new RectF(), tipBox = new RectF(), confirmBox = new RectF();
 
     // play state
     Screen screen = Screen.TITLE;
@@ -76,7 +77,7 @@ public class GameView extends View {
     int[] need = new int[Art.COUNT];
     int movesLeft, coins, landed, combo, stars, bonus;
     boolean won;
-    float dispCoins, idleTime, clearTimer, overlayT, time;
+    float dispCoins, idleTime, clearTimer, time;
     Tile selected, swapA, swapB, downTile;
     int[] hint;
     Button downButton;
@@ -134,7 +135,6 @@ public class GameView extends View {
             boosterRect[k].set(x, barTop, x + barH, barTop + barH);
         }
         hub.layout();
-        overlay.set(W * 0.08f, H * 0.2f, W * 0.92f, H * 0.8f);
         tipBox.set(W * 0.1f, H * 0.22f, W * 0.9f, H * 0.78f);
         confirmBox.set(W * 0.1f, H * 0.32f, W * 0.9f, H * 0.68f);
         coinR = hh * 0.5f;
@@ -159,7 +159,7 @@ public class GameView extends View {
             addSpeaker(m, topInset + m, hh);
             addWide(W / 2, H * 0.62f + 8.5f * u, W * 0.6f, 17 * u, "PLAY", GREEN, this::goLevels);
             addWide(W / 2, H * 0.62f + 17 * u + 4 * u + 7.5f * u, W * 0.6f, 15 * u, "MY FARM", ORANGE, () -> goScreen(Screen.FARM));
-        } else if (screen == Screen.FARM || screen == Screen.MARKET || screen == Screen.SHOP || screen == Screen.ORDERS) {
+        } else if (screen == Screen.FARM || screen == Screen.SHOP) {
             hub.build(screen);
         } else if (screen == Screen.LEVELS) {
             addBack(m, topInset + m, hh, this::goTitle);
@@ -189,19 +189,6 @@ public class GameView extends View {
                 idleTime = 0;
                 buildButtons();
             });
-        } else if (phase == Phase.END) {
-            float pw = overlay.width(), ph = overlay.height(), bh = ph * 0.11f;
-            float cx = overlay.centerX();
-            if (won) {
-                final boolean hasNext = levelIndex + 1 < Level.COUNT;
-                addWide(cx, overlay.top + ph * 0.72f, pw * 0.7f, bh, hasNext ? "NEXT LEVEL" : "ALL DONE!", GREEN,
-                        hasNext ? () -> startLevel(levelIndex + 1) : this::goLevels);
-                addWide(cx - pw * 0.19f, overlay.top + ph * 0.87f, pw * 0.34f, bh, "REPLAY", ORANGE, () -> startLevel(levelIndex));
-                addWide(cx + pw * 0.19f, overlay.top + ph * 0.87f, pw * 0.34f, bh, "MENU", BLUE, this::goLevels);
-            } else {
-                addWide(cx, overlay.top + ph * 0.72f, pw * 0.7f, bh, "TRY AGAIN", GREEN, () -> startLevel(levelIndex));
-                addWide(cx, overlay.top + ph * 0.87f, pw * 0.5f, bh, "MENU", BLUE, this::goLevels);
-            }
         } else {
             addBack(m, topInset + m, hh, this::askQuit);
             if (screen == Screen.PLAY && phase != Phase.BAG) {
@@ -282,15 +269,11 @@ public class GameView extends View {
             return true;
         }
         if (screen == Screen.FARM) {
-            if (hub.card >= 0) {
-                hub.card = -1;
-                buildButtons();
-            } else {
-                goTitle();
-            }
+            if (hub.result) goLevels();
+            else goTitle();
             return true;
         }
-        if (screen == Screen.MARKET || screen == Screen.SHOP || screen == Screen.ORDERS) {
+        if (screen == Screen.SHOP) {
             goScreen(Screen.FARM);
             return true;
         }
@@ -299,7 +282,7 @@ public class GameView extends View {
 
     /** Back arrow / system back during a level: ask first, unless the level is already decided. */
     private void askQuit() {
-        if (screen == Screen.PLAY && phase != Phase.END && phase != Phase.BAG) {
+        if (screen == Screen.PLAY && phase != Phase.BAG) {
             confirmQuit = true;
             buildButtons();
         } else {
@@ -311,14 +294,25 @@ public class GameView extends View {
         sfx.release();
     }
 
-    /** Switches to a screen that has no board (farm, market, store). */
+    /** Switches to a screen that has no board (farm or store). Coming from the menus starts the farm fresh. */
     void goScreen(Screen s) {
+        boolean fromMenu = screen == Screen.TITLE || screen == Screen.LEVELS;
         screen = s;
         phase = Phase.IDLE;
         confirmQuit = false;
         hammerMode = false;
-        if (s == Screen.FARM || s == Screen.ORDERS) progress.refreshOrders(Farm.today());
-        hub.open();
+        if (fromMenu) hub.open();
+        else hub.layout();
+        buildButtons();
+    }
+
+    /** The farm after a level, showing the result and what to spend the coins on. */
+    private void goResult() {
+        screen = Screen.FARM;
+        phase = Phase.IDLE;
+        hammerMode = false;
+        hub.showResult();
+        dispCoins = Math.max(0, progress.totalCoins - coins);
         buildButtons();
     }
 
@@ -335,7 +329,7 @@ public class GameView extends View {
         buildButtons();
     }
 
-    private void startLevel(int idx) {
+    void startLevel(int idx) {
         levelIndex = idx;
         confirmQuit = false;
         level = Level.get(idx);
@@ -353,9 +347,7 @@ public class GameView extends View {
         dying.clear();
         pendingTip = -1;
         harvest = new int[Art.CROPS];
-        harvestStored = harvestOverflow = 0;
         hammerMode = false;
-        placeStartingPowerUps();
         for (int r = 0; r < ROWS; r++) {
             for (int c = 0; c < COLS; c++) board.g[r][c].y = r - ROWS - rnd.nextFloat() * 1.5f - (COLS - c) * 0.1f;
         }
@@ -450,18 +442,13 @@ public class GameView extends View {
                 if (bagT >= BAG_PAUSE + BAG_POP && fx.bagFlyers.isEmpty()) {
                     if (bagEndT < 0) bagEndT = bagT;
                     if (bagT - bagEndT > 0.6f) {
-                        phase = Phase.END;
                         sfx.win();
-                        overlayT = 0;
-                        buildButtons();
+                        goResult();
                     }
                 }
                 break;
             case TIP:
                 tipT += dt;
-                break;
-            case END:
-                overlayT += dt;
                 break;
         }
     }
@@ -651,39 +638,27 @@ public class GameView extends View {
     }
 
     private void endLevel(boolean win) {
-        phase = Phase.END;
-        overlayT = 0;
         won = win;
         if (!win) sfx.lose();
         bonus = 0;
         stars = 0;
         if (win) {
             bonus = movesLeft * Rules.MOVE_BONUS;
-            coins += bonus;
-            landed += bonus;
             stars = Rules.stars(movesLeft, level.moves);
         }
+        playCoins = coins + bonus;
+        saleCoins = Farm.saleValue(harvest);
+        farmPct = progress.bonusPct();
+        int payout = Farm.payout(playCoins, saleCoins, farmPct);
+        landed += payout - coins;
+        coins = payout;
         progress.levelFinished(levelIndex, stars, coins);
-        int[] banked = progress.addHarvest(harvest, Farm.today());
-        harvestStored = banked[0];
-        harvestOverflow = banked[1];
-        if (win) startBag();
-        buildButtons();
-    }
-
-    /** The Scarecrow Plot upgrade scatters power-ups on the board at the start of a level. */
-    private void placeStartingPowerUps() {
-        if (!level.powerUps()) return;
-        int n = Farm.startingPowerUps(progress.building[Farm.PLOT]);
-        boolean[][] used = new boolean[ROWS][COLS];
-        while (n > 0) {
-            int r = rnd.nextInt(ROWS), c = rnd.nextInt(COLS);
-            if (used[r][c]) continue;
-            used[r][c] = true;
-            int type = Art.CROPS + rnd.nextInt(Art.COUNT - Art.CROPS);
-            board.g[r][c].type = type;
-            if (!progress.tipSeen[type] && pendingTip < 0) pendingTip = type;
-            n--;
+        if (win) {
+            phase = Phase.BAG;
+            startBag();
+            buildButtons();
+        } else {
+            goResult();
         }
     }
 

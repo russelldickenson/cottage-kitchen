@@ -190,9 +190,10 @@ public class Sim {
                 cum += Math.round(income);
                 System.out.printf("%5d %5d | %15.1f | %15.0f | %11.0f | %14.0f | %d%n", i + 1, lv.moves, crops, sale, coins, income, cum);
             }
-            int total = 0;
-            for (int b = 0; b < Farm.UPGRADES; b++) for (int c : Farm.UPGRADE_COST[b]) total += c;
-            System.out.println("All upgrades together cost " + total + " coins.");
+            int out = 0, dec = 0;
+            for (int[] row : Farm.OUTPUT_COST) for (int cost : row) out += cost;
+            for (int cost : Farm.DECOR_COST) dec += cost;
+            System.out.println("Output upgrades cost " + out + ", decorations " + dec + ", total " + (out + dec) + " coins (" + Farm.bonusPct(new int[]{3, 3, 3, 3}) + "% bonus when all bought).");
             return;
         }
         if (args.length > 1 && args[1].equals("stats")) {

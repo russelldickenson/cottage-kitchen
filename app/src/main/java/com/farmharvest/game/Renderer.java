@@ -76,9 +76,7 @@ final class Renderer {
         drawBackground(c);
         if (v.screen == Screen.TITLE) drawTitle(c);
         else if (v.screen == Screen.FARM) farm.drawFarm(c);
-        else if (v.screen == Screen.MARKET) farm.drawMarket(c);
         else if (v.screen == Screen.SHOP) farm.drawShop(c);
-        else if (v.screen == Screen.ORDERS) farm.drawOrders(c);
         else if (v.screen == Screen.LEVELS) drawLevels(c);
         else drawPlay(c);
     }
@@ -221,7 +219,6 @@ final class Renderer {
             drawBag(c);
             drawButtons(c);
         } else if (v.phase == Phase.TIP) drawTip(c);
-        else if (v.phase == Phase.END) drawEnd(c);
         else drawButtons(c);
     }
 
@@ -430,50 +427,6 @@ final class Renderer {
         drawButtons(c);
     }
 
-    private void drawEnd(Canvas c) {
-        float fade = Math.min(1f, v.overlayT * 4f);
-        c.drawColor(Color.argb((int) (150 * fade), 0, 0, 0));
-        float k = Math.min(1f, v.overlayT * 2.5f);
-        float ease = 1f + 2.70158f * (float) Math.pow(k - 1, 3) + 1.70158f * (float) Math.pow(k - 1, 2);
-        float dy = (1f - ease) * -v.H * 0.25f * (k < 1 ? 1 : 0);
-        c.save();
-        c.translate(0, dy);
-        RectF o = v.overlay;
-        float ph = o.height();
-        gfx.rrect(c, o.left, o.top + 1.5f * v.u, o.right, o.bottom + 1.5f * v.u, 6 * v.u, Gfx.darken(WOOD, 0.6f));
-        gfx.rrect(c, o.left, o.top, o.right, o.bottom, 6 * v.u, WOOD);
-        gfx.rrect(c, o.left + v.u, o.top + v.u, o.right - v.u, o.bottom - v.u, 5 * v.u, CREAM);
-        gfx.rrect(c, o.left - v.u, o.top - 4 * v.u, o.right + v.u, o.top + ph * 0.17f, 5 * v.u, v.won ? GREEN : 0xFFE5604A);
-        gfx.textC(c, v.won ? "Level Complete!" : "Out of Moves!", o.centerX(), o.top + ph * 0.06f, 7.2f * v.u, Color.WHITE, 0xFF2C4A14, Paint.Align.CENTER);
-
-        if (v.won) {
-            for (int i = 0; i < 3; i++) {
-                float sk = Math.max(0f, Math.min(1f, v.overlayT * 3f - 0.4f - i * 0.35f));
-                float x = o.centerX() + (i - 1) * 20 * v.u;
-                float y = o.top + ph * 0.3f - (i == 1 ? 3 * v.u : 0);
-                boolean on = i < v.stars;
-                float s = on ? 0.4f + 0.6f * sk : 1f;
-                gfx.star(c, x, y, 9.5f * v.u * s, on ? 0xFFFFD43B : 0xFFD8CBA8, on ? 0xFFC97700 : 0xFFB5A67E);
-            }
-        } else {
-            gfx.textC(c, "Give it another go, farmer!", o.centerX(), o.top + ph * 0.3f, 4.6f * v.u, 0xFF8B5A2B, 0, Paint.Align.CENTER);
-        }
-        String amount = "+" + v.coins;
-        float fs = 8 * v.u, tw = gfx.width(amount, fs);
-        float total = 10 * v.u + tw;
-        float sx = o.centerX() - total / 2;
-        gfx.coinPile(c, sx + 4.5f * v.u, o.top + ph * 0.46f, 5 * v.u);
-        gfx.textC(c, amount, sx + 10 * v.u, o.top + ph * 0.46f, fs, 0xFFFFC928, 0xFF7A3E0B, Paint.Align.LEFT);
-        if (v.won && v.bonus > 0) {
-            gfx.textC(c, "Moves bonus: " + v.bonus, o.centerX(), o.top + ph * 0.545f, 4.4f * v.u, 0xFF8B5A2B, 0, Paint.Align.CENTER);
-        }
-        gfx.textC(c, "Barn: +" + v.harvestStored + " crops", o.centerX(), o.top + ph * 0.60f, 4.4f * v.u, 0xFF3E9E22, 0, Paint.Align.CENTER);
-        if (v.harvestOverflow > 0) {
-            gfx.textC(c, "Barn full! Extra sold: +" + v.harvestOverflow, o.centerX(), o.top + ph * 0.65f, 3.8f * v.u, 0xFFD06A00, 0, Paint.Align.CENTER);
-        }
-        drawButtons(c);
-        c.restore();
-    }
 
     /** Glyph, owned-count badge or price, and a pulsing ring while the hammer is armed. */
     private void drawBoosterButton(Canvas c, Button b, float cx, float cy, float w) {

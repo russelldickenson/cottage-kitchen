@@ -316,6 +316,12 @@ final class Gfx {
         }
     }
 
+    void clipRRect(Canvas c, RectF r, float rad) {
+        path.reset();
+        path.addRoundRect(r, rad, rad, Path.Direction.CW);
+        c.clipPath(path);
+    }
+
     void clipCircle(Canvas c, float cx, float cy, float r) {
         path.reset();
         path.addCircle(cx, cy, r, Path.Direction.CW);
