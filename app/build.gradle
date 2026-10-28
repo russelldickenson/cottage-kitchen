@@ -15,9 +15,24 @@ android {
         versionName '1.0'
     }
 
+    // Release signing comes from the environment (set by build.sh), so no secrets live in this file.
+    // Without FARM_KEYSTORE the release build is simply left unsigned.
+    def keystorePath = System.getenv('FARM_KEYSTORE')
+    signingConfigs {
+        release {
+            if (keystorePath) {
+                storeFile file(keystorePath)
+                storePassword System.getenv('FARM_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('FARM_KEY_ALIAS')
+                keyPassword System.getenv('FARM_KEY_PASSWORD')
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
+            if (keystorePath) signingConfig signingConfigs.release
         }
     }
 
