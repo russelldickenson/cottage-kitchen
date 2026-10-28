@@ -18,6 +18,9 @@ type spec struct {
 
 const out = 192
 
+// Sprites that read too big or small at the default fit, as a multiple of the usual size.
+var scales = map[string]float64{"blueberry": 0.9}
+
 var specs = []spec{
 	{"corn", "sheet1", image.Rect(0, 20, 190, 238)},
 	{"strawberry", "sheet1", image.Rect(190, 20, 372, 238)},
@@ -67,7 +70,7 @@ func main() {
 	for _, s := range specs {
 		sp := crop(sheets[s.sheet], s.r)
 		sp = largest(sp)
-		sp = fit(sp)
+		sp = fit(sp, scaleOf(s.name))
 		f, _ := os.Create(filepath.Join(dst, "crop_"+s.name+".png"))
 		png.Encode(f, sp)
 		f.Close()
@@ -182,7 +185,14 @@ func largest(im *image.NRGBA) *image.NRGBA {
 }
 
 // fit trims to content, scales to fit a square canvas (area-averaged, premultiplied) and centres.
-func fit(im *image.NRGBA) *image.NRGBA {
+func scaleOf(name string) float64 {
+	if s, ok := scales[name]; ok {
+		return s
+	}
+	return 1
+}
+
+func fit(im *image.NRGBA, extra float64) *image.NRGBA {
 	b := im.Bounds()
 	minX, minY, maxX, maxY := b.Max.X, b.Max.Y, 0, 0
 	for y := b.Min.Y; y < b.Max.Y; y++ {
@@ -195,7 +205,7 @@ func fit(im *image.NRGBA) *image.NRGBA {
 	}
 	cw, ch := maxX-minX+1, maxY-minY+1
 	const pad = 6
-	scale := float64(out-2*pad) / float64(max(cw, ch))
+	scale := extra * float64(out-2*pad) / float64(max(cw, ch))
 	nw, nh := int(float64(cw)*scale+0.5), int(float64(ch)*scale+0.5)
 	res := image.NewNRGBA(image.Rect(0, 0, out, out))
 	ox, oy := (out-nw)/2, (out-nh)/2
