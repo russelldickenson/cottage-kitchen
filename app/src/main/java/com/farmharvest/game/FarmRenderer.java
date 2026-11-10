@@ -16,17 +16,14 @@ final class FarmRenderer {
     private static final int OUT = 0xFF3E2008, INK = 0xFF6B3F17, PRICE_BAD = 0xFFFF9A8A;
     static final int[] BOOSTER_COLOR = {ORANGE, BLUE, GREEN};
 
-    // crop art used as the icon of each output upgrade: egg, bee, apple, pumpkin
-    private static final int[] OUTPUT_CROP = {6, 11, 4, 5};
+    private static final String[] ANIMAL_CARD = {"Coop", "Barn", "Hatch", "Cow"};
+    private static final int RED = 0xFFD9453A;
 
     // Positions inside the scene: x and y as fractions of its width and height, and the item size as a fraction of its width.
     private static final float[] BARN_POS = {0.37f, 0.52f, 0.34f};
-    private static final float[][] OUTPUT_POS = {
-            {0.79f, 0.55f, 0.28f},   // coop
-            {0.585f, 0.34f, 0.15f},   // beehive
-            {0.12f, 0.74f, 0.20f},   // orchard
-            {0.50f, 0.80f, 0.22f},   // pumpkin patch
-    };
+    private static final float[] COOP_POS = {0.79f, 0.55f, 0.28f};
+    /** Where the animals tab buttons act in the scene: coop, barn, hatch (coop), cow (barn). */
+    private static final float[][] ANIMAL_POS = {COOP_POS, BARN_POS, COOP_POS, BARN_POS};
     private static final float[][] DECOR_POS = {
             {0.50f, 0.96f, 0.98f},   // fence (x is the centre, size is its width)
             {0.29f, 0.88f, 0.20f},   // flowers
@@ -86,12 +83,6 @@ final class FarmRenderer {
         drawScene(c);
         drawTabs(c);
         for (int i = 0; i < h.cardCount(); i++) drawCard(c, i);
-        if (h.tab == FarmHub.TAB_UPGRADES) {
-            RectF row = h.card[4];
-            float u = v.u;
-            gfx.textC(c, "Every upgrade level adds +" + Farm.BONUS_PCT_PER_LEVEL + "% to what you", v.W / 2, row.top + 5 * u, 3.9f * u, Color.WHITE, 0xFF1F5F10, Paint.Align.CENTER);
-            gfx.textC(c, "earn after every level.", v.W / 2, row.top + 10.5f * u, 3.9f * u, Color.WHITE, 0xFF1F5F10, Paint.Align.CENTER);
-        }
         drawShopButton(c);
         effects(c);
         r.drawButtons(c);
@@ -131,14 +122,29 @@ final class FarmRenderer {
                         on ? 0xFFFFD43B : 0xFFD8CBA8, on ? 0xFFC97700 : 0xFFB5A67E);
             }
         }
-        String detail = "Play " + v.playCoins + "  +  Harvest " + v.saleCoins + (v.farmPct > 0 ? "  +  Farm " + v.farmPct + "%" : "");
+        String detail = "Play " + v.playCoins + "  +  Harvest " + v.saleCoins + (v.animalCoins > 0 ? "  +  Animals " + v.animalCoins : "");
         gfx.textC(c, detail, b.centerX(), b.top + h - 2.7f * u, 3.3f * u, 0xFF8B5A2B, 0, Paint.Align.CENTER);
+
+        // what went into the farm stock, and how the animals got on
+        StringBuilder haul = new StringBuilder();
+        for (int s = 0; s < Farm.STOCKS; s++) {
+            int n = v.report.hauled[s];
+            if (n > 0) haul.append(haul.length() > 0 ? "  " : "").append('+').append(n).append(' ').append(Farm.STOCK_NAME[s].toLowerCase());
+        }
+        if (haul.length() == 0) haul.append("No farm stock this time");
+        gfx.textC(c, haul.toString(), b.centerX(), b.top + h - 12.5f * u, 3.6f * u, 0xFF3E7A22, 0, Paint.Align.CENTER);
+        Farm.Herd hd = v.progress.herd;
+        if (v.report.hungry > 0) {
+            gfx.textC(c, v.report.hungry + (v.report.hungry == 1 ? " animal went hungry" : " animals went hungry"), b.centerX(), b.top + h - 7.8f * u, 3.4f * u, RED, 0, Paint.Align.CENTER);
+        } else if (hd.house[Farm.COOP] + hd.house[Farm.BARN] == 0) {
+            gfx.textC(c, "Build a coop below to use your eggs!", b.centerX(), b.top + h - 7.8f * u, 3.4f * u, 0xFF8B5A2B, 0, Paint.Align.CENTER);
+        }
     }
 
     private void drawTabs(Canvas c) {
         FarmHub h = v.hub;
         float u = v.u;
-        String[] names = {"UPGRADES", "DECOR"};
+        String[] names = {"ANIMALS", "DECOR"};
         for (int t = 0; t < 2; t++) {
             RectF b = h.tabRect[t];
             boolean on = h.tab == t;
@@ -161,16 +167,19 @@ final class FarmRenderer {
         gfx.rrect(c, cd.left, cd.top + 1f * u + off, cd.right, cd.bottom + 1f * u + off, 3.5f * u, Gfx.darken(WOOD, 0.6f));
         gfx.rrect(c, cd.left, cd.top + off, cd.right, cd.bottom + off, 3.5f * u, WOOD);
         gfx.rrect(c, cd.left + 0.6f * u, cd.top + 0.6f * u + off, cd.right - 0.6f * u, cd.bottom - 0.6f * u + off, 3f * u, CREAM);
+        if (!decor && i >= FarmHub.ANIMAL_ACTIONS) {
+            drawInfoCard(c, i, cd);
+            return;
+        }
 
         float ix = cd.left + 10 * u, iy = cd.top + hgt * 0.5f + off, box = Math.min(15 * u, hgt * 0.68f);
         drawIcon(c, decor, i, ix, iy, box);
 
         float tx = cd.left + 19.5f * u;
-        String name = decor ? Farm.DECOR_NAME[i] : Farm.OUTPUT_NAME[i];
-        gfx.textC(c, name, tx, cd.top + hgt * 0.24f + off, 4.4f * u, INK, 0, Paint.Align.LEFT);
-        float py = cd.top + hgt * 0.73f + off;
+        gfx.textC(c, decor ? Farm.DECOR_NAME[i] : ANIMAL_CARD[i], tx, cd.top + hgt * 0.24f + off, 4.4f * u, INK, 0, Paint.Align.LEFT);
+        float subY = cd.top + hgt * 0.47f + off, py = cd.top + hgt * 0.73f + off;
         if (decor) {
-            gfx.textC(c, "Decoration", tx, cd.top + hgt * 0.47f + off, 3.2f * u, 0xFF8B5A2B, 0, Paint.Align.LEFT);
+            gfx.textC(c, "Decoration", tx, subY, 3.2f * u, 0xFF8B5A2B, 0, Paint.Align.LEFT);
             if (p.decor[i]) {
                 gfx.check(c, tx + 2.2f * u, py, 2.4f * u);
                 gfx.textC(c, "Owned", tx + 6 * u, py, 4f * u, 0xFF3E9E22, 0, Paint.Align.LEFT);
@@ -178,15 +187,87 @@ final class FarmRenderer {
                 priceChip(c, tx + 10 * u, py, Farm.DECOR_COST[i], p.totalCoins >= Farm.DECOR_COST[i], 4.4f * u);
             }
         } else {
-            int lvl = p.output[i];
-            for (int k = 0; k < Farm.MAX_OUTPUT_LEVEL; k++) {
-                float px = tx + 1.6f * u + k * 4.2f * u, py2 = cd.top + hgt * 0.47f + off;
-                gfx.circle(c, px, py2, 1.5f * u, k < lvl ? 0xFFFFC928 : 0x33000000);
-                gfx.circleLine(c, px, py2, 1.5f * u, 0.4f * u, k < lvl ? 0xFFC97700 : 0xFF8B5A2B);
+            animalCard(c, i, tx, subY, py);
+        }
+    }
+
+    private void animalCard(Canvas c, int i, float tx, float subY, float py) {
+        Progress p = v.progress;
+        Farm.Herd hd = p.herd;
+        float u = v.u;
+        switch (i) {
+            case FarmHub.CARD_COOP:
+            case FarmHub.CARD_BARN: {
+                int house = i == FarmHub.CARD_COOP ? Farm.COOP : Farm.BARN;
+                for (int k = 0; k < Farm.MAX_HOUSE_LEVEL; k++) {
+                    float px = tx + 1.6f * u + k * 4.2f * u;
+                    boolean on = k < hd.house[house];
+                    gfx.circle(c, px, subY, 1.5f * u, on ? 0xFFFFC928 : 0x33000000);
+                    gfx.circleLine(c, px, subY, 1.5f * u, 0.4f * u, on ? 0xFFC97700 : 0xFF8B5A2B);
+                }
+                int cost = p.houseCost(house);
+                if (cost < 0) {
+                    gfx.textC(c, "MAX", tx + 4 * u, py, 4.6f * u, 0xFF3E9E22, 0xFFFFFFFF, Paint.Align.LEFT);
+                } else if (!p.houseUnlocked(house)) {
+                    gfx.lock(c, tx + 2.2f * u, py, 2.4f * u);
+                    gfx.textC(c, "Beat level " + (Farm.HOUSE_UNLOCK_LEVEL[house] - 1), tx + 6 * u, py, 3.6f * u, 0xFF8B5A2B, 0, Paint.Align.LEFT);
+                } else {
+                    priceChip(c, tx + 10 * u, py, cost, p.totalCoins >= cost, 4.4f * u);
+                }
+                break;
             }
-            int cost = p.outputCost(i);
-            if (cost < 0) gfx.textC(c, "MAX", tx + 4 * u, py, 4.6f * u, 0xFF3E9E22, 0xFFFFFFFF, Paint.Align.LEFT);
-            else priceChip(c, tx + 10 * u, py, cost, p.totalCoins >= cost, 4.4f * u);
+            case FarmHub.CARD_HATCH: {
+                gfx.textC(c, Farm.EGGS_PER_CHICK + " eggs = 1 chick", tx, subY, 3.2f * u, 0xFF8B5A2B, 0, Paint.Align.LEFT);
+                if (hd.canHatch()) {
+                    gfx.textC(c, "HATCH", tx, py, 4.4f * u, 0xFF3E9E22, 0xFFFFFFFF, Paint.Align.LEFT);
+                } else {
+                    String why = hd.house[Farm.COOP] == 0 ? "Build a coop" : hd.chickenRoom() <= 0 ? "Coop is full"
+                            : "Need " + (Farm.EGGS_PER_CHICK - hd.stock[Farm.EGG]) + " more";
+                    gfx.textC(c, why, tx, py, 3.6f * u, 0xFF8B5A2B, 0, Paint.Align.LEFT);
+                }
+                break;
+            }
+            default: {
+                gfx.textC(c, "Earns " + Farm.COW_COINS + " a level", tx, subY, 3.2f * u, 0xFF8B5A2B, 0, Paint.Align.LEFT);
+                String why = hd.house[Farm.BARN] == 0 ? "Build a barn" : hd.cowRoom() <= 0 ? "Barn is full" : null;
+                if (why != null) gfx.textC(c, why, tx, py, 3.6f * u, 0xFF8B5A2B, 0, Paint.Align.LEFT);
+                else priceChip(c, tx + 10 * u, py, Farm.COW_PRICE, p.totalCoins >= Farm.COW_PRICE, 4.4f * u);
+            }
+        }
+    }
+
+    /** The two read-only cards on the animals tab: herd size and feed stock (red when short for the next level). */
+    private void drawInfoCard(Canvas c, int i, RectF cd) {
+        Farm.Herd hd = v.progress.herd;
+        float u = v.u, hgt = cd.height();
+        if (i == 4) {
+            float lx = cd.left + 4 * u;
+            int chicks = hd.chickCount();
+            gfx.textC(c, "Hens " + (hd.chickens + chicks) + "/" + Farm.capacity(Farm.COOP, hd.house[Farm.COOP]) + (chicks > 0 ? " (" + chicks + " chicks)" : ""),
+                    lx, cd.top + hgt * 0.22f, 3.5f * u, INK, 0, Paint.Align.LEFT);
+            gfx.textC(c, "Cows " + hd.cows + "/" + Farm.capacity(Farm.BARN, hd.house[Farm.BARN]), lx, cd.top + hgt * 0.5f, 3.5f * u, INK, 0, Paint.Align.LEFT);
+            boolean short_ = false;
+            for (int s = 1; s < Farm.STOCKS; s++) short_ |= hd.need(s) > hd.stock[s];
+            String status;
+            int col;
+            if (hd.chickens + hd.cows == 0) {
+                status = "Hatch eggs to start";
+                col = 0xFF8B5A2B;
+            } else if (short_) {
+                status = "Low on feed!";
+                col = RED;
+            } else {
+                status = "All fed";
+                col = 0xFF3E9E22;
+            }
+            gfx.textC(c, status, lx, cd.top + hgt * 0.78f, 3.5f * u, col, 0, Paint.Align.LEFT);
+            return;
+        }
+        for (int s = 0; s < Farm.STOCKS; s++) {
+            float x = s % 2 == 0 ? cd.left + 3 * u : cd.left + cd.width() / 2 + 0.5f * u, y = cd.top + hgt * (s < 2 ? 0.3f : 0.72f);
+            r.drawIcon(c, Farm.STOCK_TILE[s], x + 3.5f * u, y, 7.5f * u);
+            int need = hd.need(s), have = hd.stock[s];
+            gfx.textC(c, need > 0 ? have + "/" + need : String.valueOf(have), x + 8 * u, y, 3.8f * u, need > have ? RED : INK, 0, Paint.Align.LEFT);
         }
     }
 
@@ -194,17 +275,17 @@ final class FarmRenderer {
     private void drawIcon(Canvas c, boolean decor, int i, float cx, float cy, float box) {
         if (!decor) {
             switch (i) {
-                case Farm.COOP:
+                case FarmHub.CARD_COOP:
                     coop(c, cx, cy - 0.06f * box, box * 0.95f, 1);
                     break;
-                case Farm.HIVE:
-                    hive(c, cx, cy, box * 1.05f, 1);
+                case FarmHub.CARD_BARN:
+                    barn(c, cx, cy, box * 0.95f, 1);
                     break;
-                case Farm.ORCHARD:
-                    orchard(c, cx, cy, box * 0.85f, 1);
+                case FarmHub.CARD_HATCH:
+                    r.drawIcon(c, Farm.STOCK_TILE[Farm.EGG], cx, cy, box * 0.95f);
                     break;
                 default:
-                    patch(c, cx, cy, box * 0.95f, 1);
+                    cow(c, cx, cy - 0.04f * box, box * 0.85f, 1, 0);
             }
             return;
         }
@@ -232,7 +313,7 @@ final class FarmRenderer {
     /** Centre of an item in the scene, in pixels, for sparkles when it is bought. */
     float[] itemCenter(boolean decor, int i) {
         RectF s = v.hub.scene;
-        float[] p = decor ? DECOR_POS[i] : OUTPUT_POS[i];
+        float[] p = decor ? DECOR_POS[i] : ANIMAL_POS[i];
         return new float[]{s.left + p[0] * s.width(), s.top + p[1] * s.height()};
     }
 
@@ -241,6 +322,7 @@ final class FarmRenderer {
     private void drawScene(Canvas c) {
         RectF s = v.hub.scene;
         Progress p = v.progress;
+        Farm.Herd hd = p.herd;
         float u = v.u, ws = s.width(), hs = s.height();
         c.save();
         gfx.clipRRect(c, s, 4 * u);
@@ -253,72 +335,59 @@ final class FarmRenderer {
         gfx.rrect(c, s.left, s.top + hs * 0.36f, s.right, s.bottom, 0, 0xFF8BD450);
         gfx.rrect(c, s.left, s.top + hs * 0.88f, s.right, s.bottom, 0, 0xFF74C043);
 
-        // back to front
-        if (p.decor[Farm.WINDMILL]) place(c, s, DECOR_POS[Farm.WINDMILL], 0, Farm.WINDMILL, true, 0);
-        if (p.decor[Farm.BALLOON]) place(c, s, DECOR_POS[Farm.BALLOON], 0, Farm.BALLOON, true, 0);
-        if (p.decor[Farm.OAK]) place(c, s, DECOR_POS[Farm.OAK], 0, Farm.OAK, true, 0);
-        barn(c, s.left + BARN_POS[0] * ws, s.top + BARN_POS[1] * hs, BARN_POS[2] * ws);
-        for (int k : new int[]{Farm.HIVE, Farm.COOP, Farm.ORCHARD, Farm.PATCH}) {
-            int lvl = p.output[k];
-            if (lvl == 0) c.saveLayerAlpha(s.left, s.top, s.right, s.bottom, 85);
-            place(c, s, OUTPUT_POS[k], lvl, k, false, lvl);
-            if (lvl == 0) c.restore();
-        }
-        if (p.decor[Farm.FLOWERS]) place(c, s, DECOR_POS[Farm.FLOWERS], 0, Farm.FLOWERS, true, 0);
-        if (p.decor[Farm.POND]) place(c, s, DECOR_POS[Farm.POND], 0, Farm.POND, true, 0);
-        if (p.decor[Farm.FENCE]) place(c, s, DECOR_POS[Farm.FENCE], 0, Farm.FENCE, true, 0);
+        // back to front; houses that are not built yet show as faded outlines
+        if (p.decor[Farm.WINDMILL]) decor(c, s, Farm.WINDMILL);
+        if (p.decor[Farm.BALLOON]) decor(c, s, Farm.BALLOON);
+        if (p.decor[Farm.OAK]) decor(c, s, Farm.OAK);
+        boolean noBarn = hd.house[Farm.BARN] == 0, noCoop = hd.house[Farm.COOP] == 0;
+        if (noBarn) c.saveLayerAlpha(s.left, s.top, s.right, s.bottom, 85);
+        barn(c, s.left + BARN_POS[0] * ws, s.top + BARN_POS[1] * hs, BARN_POS[2] * ws, hd.house[Farm.BARN]);
+        if (noBarn) c.restore();
+        if (noCoop) c.saveLayerAlpha(s.left, s.top, s.right, s.bottom, 85);
+        coop(c, s.left + COOP_POS[0] * ws, s.top + COOP_POS[1] * hs, COOP_POS[2] * ws, hd.house[Farm.COOP]);
+        if (noCoop) c.restore();
+        if (p.decor[Farm.FLOWERS]) decor(c, s, Farm.FLOWERS);
+        if (p.decor[Farm.POND]) decor(c, s, Farm.POND);
+        drawAnimals(c, s);
+        if (p.decor[Farm.FENCE]) decor(c, s, Farm.FENCE);
         c.restore();
         gfx.rrectLine(c, s.left, s.top, s.right, s.bottom, 4 * u, 1f * u, WOOD);
 
-        int pct = p.bonusPct();
-        String label = pct > 0 ? "+" + pct + "% coins" : "Buy upgrades to earn more";
+        boolean any = hd.chickens + hd.chickCount() + hd.cows > 0;
+        String label = noCoop && noBarn ? "Build a coop to start" : !any ? "Hatch eggs, buy cows" : "Hens " + hd.chickens + "   Cows " + hd.cows;
         float tw = gfx.width(label, 3.6f * u), pl = s.left + 2.5f * u, pt = s.top + 2.5f * u;
         gfx.rrect(c, pl, pt, pl + tw + 5 * u, pt + 6 * u, 3 * u, 0xCC6B3F17);
-        gfx.textC(c, label, pl + 2.5f * u + tw / 2, pt + 3 * u, 3.6f * u, pct > 0 ? 0xFFFFE066 : Color.WHITE, 0, Paint.Align.CENTER);
+        gfx.textC(c, label, pl + 2.5f * u + tw / 2, pt + 3 * u, 3.6f * u, any ? 0xFFFFE066 : Color.WHITE, 0, Paint.Align.CENTER);
     }
 
-    private void place(Canvas c, RectF s, float[] pos, int lvl, int item, boolean decor, int extra) {
+    private void decor(Canvas c, RectF s, int item) {
+        float[] pos = DECOR_POS[item];
         float ws = s.width(), cx = s.left + pos[0] * ws, cy = s.top + pos[1] * s.height(), sz = pos[2] * ws;
-        if (decor) {
-            switch (item) {
-                case Farm.FENCE:
-                    fence(c, s.left + 0.01f * ws, s.right - 0.01f * ws, cy, 0.09f * ws);
-                    break;
-                case Farm.FLOWERS:
-                    flowers(c, cx, cy, sz);
-                    break;
-                case Farm.POND:
-                    pond(c, cx, cy, sz);
-                    break;
-                case Farm.OAK:
-                    oak(c, cx, cy, sz);
-                    break;
-                case Farm.WINDMILL:
-                    windmill(c, cx, cy, sz);
-                    break;
-                default:
-                    balloon(c, cx, cy, sz);
-            }
-        } else {
-            switch (item) {
-                case Farm.COOP:
-                    coop(c, cx, cy, sz, extra);
-                    break;
-                case Farm.HIVE:
-                    hive(c, cx, cy, sz, extra);
-                    break;
-                case Farm.ORCHARD:
-                    orchard(c, cx, cy, sz, extra);
-                    break;
-                default:
-                    patch(c, cx, cy, sz, extra);
-            }
+        switch (item) {
+            case Farm.FENCE:
+                fence(c, s.left + 0.01f * ws, s.right - 0.01f * ws, cy, 0.09f * ws);
+                break;
+            case Farm.FLOWERS:
+                flowers(c, cx, cy, sz);
+                break;
+            case Farm.POND:
+                pond(c, cx, cy, sz);
+                break;
+            case Farm.OAK:
+                oak(c, cx, cy, sz);
+                break;
+            case Farm.WINDMILL:
+                windmill(c, cx, cy, sz);
+                break;
+            default:
+                balloon(c, cx, cy, sz);
         }
     }
 
     // ---- items, each centred on (cx, cy) and roughly s wide and tall
 
-    private void barn(Canvas c, float cx, float cy, float s) {
+    private void barn(Canvas c, float cx, float cy, float s, int lvl) {
+        if (lvl >= 2) silo(c, cx - 0.53f * s, cy + 0.42f * s, s);
         float w = 0.36f * s;
         gfx.rrect(c, cx - w, cy - 0.02f * s, cx + w, cy + 0.42f * s, 0.03f * s, 0xFFD9453A);
         gfx.rrectLine(c, cx - w, cy - 0.02f * s, cx + w, cy + 0.42f * s, 0.03f * s, 0.025f * s, OUT);
@@ -330,6 +399,21 @@ final class FarmRenderer {
         gfx.lineSeg(c, cx - 0.16f * s, cy + 0.1f * s, cx + 0.16f * s, cy + 0.42f * s, 0.03f * s, 0xFFD9453A);
         gfx.lineSeg(c, cx + 0.16f * s, cy + 0.1f * s, cx - 0.16f * s, cy + 0.42f * s, 0.03f * s, 0xFFD9453A);
         gfx.rrectLine(c, cx - 0.16f * s, cy + 0.1f * s, cx + 0.16f * s, cy + 0.42f * s, 0.02f * s, 0.025f * s, OUT);
+        if (lvl >= 3) {
+            // a stack of hay bales beside the barn
+            r.drawIcon(c, Farm.STOCK_TILE[Farm.HAY], cx + 0.5f * s, cy + 0.32f * s, 0.26f * s);
+            r.drawIcon(c, Farm.STOCK_TILE[Farm.HAY], cx + 0.44f * s, cy + 0.14f * s, 0.2f * s);
+        }
+    }
+
+    private void silo(Canvas c, float x, float yBase, float s) {
+        float w = 0.1f * s, top = yBase - 0.66f * s;
+        gfx.rrect(c, x - w, top, x + w, yBase, 0.02f * s, 0xFFC9D6E3);
+        gfx.lineSeg(c, x - w, top + 0.18f * s, x + w, top + 0.18f * s, 0.015f * s, 0xFF8FA3B8);
+        gfx.lineSeg(c, x - w, top + 0.34f * s, x + w, top + 0.34f * s, 0.015f * s, 0xFF8FA3B8);
+        gfx.rrectLine(c, x - w, top, x + w, yBase, 0.02f * s, 0.02f * s, OUT);
+        gfx.ellipse(c, x, top, w * 1.1f, 0.09f * s, OUT);
+        gfx.ellipse(c, x, top, w, 0.075f * s, 0xFFD9453A);
     }
 
     private void coop(Canvas c, float cx, float cy, float s, int lvl) {
@@ -340,52 +424,85 @@ final class FarmRenderer {
         gfx.circleLine(c, cx, cy - 0.17f * s, 0.07f * s, 0.02f * s, OUT);
         gfx.rrect(c, cx - 0.1f * s, cy + 0.08f * s, cx + 0.1f * s, cy + 0.32f * s, 0.03f * s, 0xFF8B5A2B);
         gfx.rrectLine(c, cx - 0.1f * s, cy + 0.08f * s, cx + 0.1f * s, cy + 0.32f * s, 0.03f * s, 0.02f * s, OUT);
-        int n = Math.max(1, Math.min(lvl, 3));
-        for (int k = 0; k < n; k++) {
-            boolean gold = lvl >= 3 && k == n - 1;
-            r.drawIcon(c, gold ? Art.GOLDEN_EGG : 6, cx + (k - (n - 1) / 2f) * 0.3f * s, cy + 0.44f * s, 0.3f * s);
+        if (lvl >= 2) fence(c, cx - 0.52f * s, cx + 0.52f * s, cy + 0.5f * s, 0.2f * s);
+        if (lvl >= 3) r.drawIcon(c, Art.GOLDEN_EGG, cx, cy - 0.5f * s, 0.3f * s);
+    }
+
+    // ---- animals, each centred on (x, y) with s the body length; dir is 1 facing right, -1 facing left
+
+    private void chicken(Canvas c, float x, float y, float s, float dir, float phase) {
+        float peck = Math.max(0f, (float) Math.sin(phase * 2.2f)) * 0.1f * s;
+        for (float lx : new float[]{-0.06f, 0.1f}) {
+            gfx.lineSeg(c, x + dir * lx * s, y + 0.22f * s, x + dir * lx * s, y + 0.4f * s, 0.04f * s, 0xFFFF9B26);
         }
+        gfx.polygon(c, Color.WHITE, OUT, 0.02f * s, x - dir * 0.26f * s, y - 0.02f * s, x - dir * 0.46f * s, y - 0.22f * s, x - dir * 0.4f * s, y + 0.08f * s);
+        gfx.ellipse(c, x, y + 0.06f * s, 0.36f * s, 0.28f * s, OUT);
+        gfx.ellipse(c, x, y + 0.06f * s, 0.33f * s, 0.25f * s, Color.WHITE);
+        gfx.ellipse(c, x - dir * 0.04f * s, y + 0.1f * s, 0.17f * s, 0.12f * s, 0xFFEADFC9);
+        float hx = x + dir * 0.26f * s, hy = y - 0.2f * s + peck;
+        gfx.circle(c, hx, hy - 0.16f * s, 0.085f * s, OUT);
+        gfx.circle(c, hx, hy - 0.16f * s, 0.06f * s, RED);
+        gfx.circle(c, hx, hy, 0.19f * s, OUT);
+        gfx.circle(c, hx, hy, 0.165f * s, Color.WHITE);
+        gfx.polygon(c, 0xFFFFB300, OUT, 0.015f * s, hx + dir * 0.14f * s, hy - 0.04f * s, hx + dir * 0.3f * s, hy + 0.01f * s, hx + dir * 0.14f * s, hy + 0.06f * s);
+        gfx.circle(c, hx + dir * 0.05f * s, hy - 0.03f * s, 0.03f * s, OUT);
+        gfx.circle(c, hx + dir * 0.02f * s, hy + 0.11f * s, 0.04f * s, RED);
     }
 
-    private void hive(Canvas c, float cx, float cy, float s, int lvl) {
-        for (int k = 0; k < 3; k++) {
-            float y = cy + 0.26f * s - k * 0.2f * s, w = (0.3f - 0.04f * k) * s;
-            gfx.rrect(c, cx - w, y - 0.1f * s, cx + w, y + 0.1f * s, 0.1f * s, k % 2 == 0 ? 0xFFFFC928 : 0xFFFFB300);
-            gfx.rrectLine(c, cx - w, y - 0.1f * s, cx + w, y + 0.1f * s, 0.1f * s, 0.02f * s, OUT);
+    private void chick(Canvas c, float x, float y, float s, float dir, float phase) {
+        y -= Math.abs((float) Math.sin(phase * 3f)) * 0.08f * s;
+        gfx.lineSeg(c, x - 0.07f * s, y + 0.28f * s, x - 0.07f * s, y + 0.4f * s, 0.035f * s, 0xFFFF9B26);
+        gfx.lineSeg(c, x + 0.07f * s, y + 0.28f * s, x + 0.07f * s, y + 0.4f * s, 0.035f * s, 0xFFFF9B26);
+        gfx.circle(c, x, y, 0.36f * s, OUT);
+        gfx.circle(c, x, y, 0.32f * s, 0xFFFFE066);
+        gfx.polygon(c, 0xFFFF9B26, OUT, 0.015f * s, x + dir * 0.28f * s, y - 0.04f * s, x + dir * 0.44f * s, y + 0.02f * s, x + dir * 0.28f * s, y + 0.08f * s);
+        gfx.circle(c, x + dir * 0.13f * s, y - 0.08f * s, 0.04f * s, OUT);
+    }
+
+    private void cow(Canvas c, float x, float y, float s, float dir, float phase) {
+        final int spot = 0xFF4A3A33, pink = 0xFFFFB3B8;
+        float bob = (float) Math.sin(phase * 1.2f) * 0.012f * s;
+        for (float lx : new float[]{-0.28f, -0.14f, 0.16f, 0.3f}) {
+            float px = x + dir * lx * s;
+            gfx.rrect(c, px - 0.05f * s, y + 0.1f * s, px + 0.05f * s, y + 0.34f * s, 0.02f * s, OUT);
+            gfx.rrect(c, px - 0.035f * s, y + 0.1f * s, px + 0.035f * s, y + 0.3f * s, 0.015f * s, Color.WHITE);
+            gfx.rrect(c, px - 0.04f * s, y + 0.29f * s, px + 0.04f * s, y + 0.34f * s, 0.01f * s, spot);
         }
-        gfx.rrect(c, cx - 0.2f * s, cy - 0.3f * s, cx + 0.2f * s, cy - 0.15f * s, 0.06f * s, 0xFFB5793B);
-        gfx.rrectLine(c, cx - 0.2f * s, cy - 0.3f * s, cx + 0.2f * s, cy - 0.15f * s, 0.06f * s, 0.02f * s, OUT);
-        gfx.circle(c, cx, cy + 0.28f * s, 0.05f * s, OUT);
-        int n = Math.max(1, Math.min(lvl, 3));
-        for (int k = 0; k < n; k++) {
-            float a = v.time * 2 + k * 2.1f;
-            r.drawIcon(c, 11, cx + (float) Math.cos(a) * 0.42f * s, cy - 0.12f * s + (float) Math.sin(a * 1.5f) * 0.1f * s, 0.26f * s);
+        gfx.lineSeg(c, x - dir * 0.4f * s, y - 0.08f * s, x - dir * 0.48f * s, y + 0.14f * s, 0.03f * s, OUT);
+        gfx.circle(c, x - dir * 0.48f * s, y + 0.16f * s, 0.04f * s, spot);
+        gfx.ellipse(c, x, y, 0.42f * s, 0.25f * s, OUT);
+        gfx.ellipse(c, x, y, 0.395f * s, 0.225f * s, Color.WHITE);
+        gfx.circle(c, x - dir * 0.16f * s, y - 0.06f * s, 0.09f * s, spot);
+        gfx.circle(c, x + dir * 0.06f * s, y + 0.08f * s, 0.07f * s, spot);
+        gfx.circle(c, x - dir * 0.3f * s, y + 0.08f * s, 0.06f * s, spot);
+        gfx.ellipse(c, x - dir * 0.1f * s, y + 0.22f * s, 0.06f * s, 0.035f * s, pink);
+        float hx = x + dir * 0.42f * s, hy = y - 0.1f * s + bob;
+        gfx.polygon(c, CREAM, OUT, 0.012f * s, hx - dir * 0.03f * s, hy - 0.11f * s, hx - dir * 0.01f * s, hy - 0.2f * s, hx + dir * 0.04f * s, hy - 0.11f * s);
+        gfx.ellipse(c, hx - dir * 0.1f * s, hy - 0.06f * s, 0.065f * s, 0.035f * s, OUT);
+        gfx.ellipse(c, hx, hy, 0.16f * s, 0.14f * s, OUT);
+        gfx.ellipse(c, hx, hy, 0.145f * s, 0.125f * s, Color.WHITE);
+        gfx.ellipse(c, hx + dir * 0.08f * s, hy + 0.05f * s, 0.09f * s, 0.07f * s, pink);
+        gfx.circle(c, hx + dir * 0.1f * s, hy + 0.05f * s, 0.012f * s, OUT);
+        gfx.circle(c, hx + dir * 0.02f * s, hy - 0.04f * s, 0.022f * s, OUT);
+    }
+
+    /** The herd, wandering in front of the coop and barn. At most 6 cows and 12 chickens and chicks are drawn. */
+    private void drawAnimals(Canvas c, RectF s) {
+        Farm.Herd hd = v.progress.herd;
+        float ws = s.width(), hs = s.height(), t = v.time;
+        for (int k = 0; k < Math.min(hd.cows, 6); k++) {
+            float ph = t * 0.45f + k * 1.9f;
+            float x = 0.19f + 0.15f * (k % 3) + 0.02f * (float) Math.sin(ph), y = 0.72f + 0.085f * (k / 3);
+            cow(c, s.left + x * ws, s.top + y * hs, 0.15f * ws, Math.cos(ph) >= 0 ? 1 : -1, t + k);
         }
-    }
-
-    private void tree(Canvas c, float x, float y, float ts) {
-        gfx.rrect(c, x - 0.06f * ts, y + 0.02f * ts, x + 0.06f * ts, y + 0.42f * ts, 0.02f * ts, 0xFF8B5A2B);
-        gfx.rrectLine(c, x - 0.06f * ts, y + 0.02f * ts, x + 0.06f * ts, y + 0.42f * ts, 0.02f * ts, 0.02f * ts, OUT);
-        gfx.circle(c, x - 0.22f * ts, y + 0.04f * ts, 0.2f * ts, 0xFF3E9E3E);
-        gfx.circle(c, x + 0.22f * ts, y + 0.04f * ts, 0.2f * ts, 0xFF3E9E3E);
-        gfx.circle(c, x, y - 0.14f * ts, 0.3f * ts, 0xFF4CAF50);
-        gfx.circle(c, x - 0.08f * ts, y - 0.24f * ts, 0.1f * ts, 0xFF6BC46B);
-        float[][] apples = {{-0.14f, -0.12f}, {0.12f, -0.2f}, {0.2f, 0.02f}, {-0.24f, 0.06f}};
-        for (float[] a : apples) gfx.circle(c, x + a[0] * ts, y + a[1] * ts, 0.05f * ts, 0xFFE5304A);
-    }
-
-    private void orchard(Canvas c, float cx, float cy, float s, int lvl) {
-        int n = Math.max(1, Math.min(lvl, 3));
-        float ts = n == 1 ? s : s * 0.78f;
-        for (int k = 0; k < n; k++) tree(c, cx + (k - (n - 1) / 2f) * 0.62f * s, cy - 0.04f * s + (k % 2) * 0.04f * s, ts);
-    }
-
-    private void patch(Canvas c, float cx, float cy, float s, int lvl) {
-        gfx.rrect(c, cx - 0.48f * s, cy + 0.0f * s, cx + 0.48f * s, cy + 0.3f * s, 0.07f * s, 0xFF9A6A3A);
-        gfx.rrectLine(c, cx - 0.48f * s, cy + 0.0f * s, cx + 0.48f * s, cy + 0.3f * s, 0.07f * s, 0.025f * s, OUT);
-        for (int k = 0; k < 2; k++) gfx.lineSeg(c, cx - 0.4f * s, cy + (0.1f + k * 0.1f) * s, cx + 0.4f * s, cy + (0.1f + k * 0.1f) * s, 0.02f * s, 0xFF7A4E26);
-        int n = Math.min(1 + lvl, 4);
-        for (int k = 0; k < n; k++) r.drawIcon(c, 5, cx + (k - (n - 1) / 2f) * 0.27f * s, cy - 0.07f * s + (k % 2) * 0.05f * s, 0.36f * s);
+        int total = Math.min(12, hd.chickens + hd.chickCount());
+        for (int k = 0; k < total; k++) {
+            float ph = t * 1.3f + k * 2.3f;
+            float x = 0.67f + 0.075f * (k % 4) + 0.015f * (float) Math.sin(ph * 0.5f), y = 0.65f + 0.06f * (k / 4);
+            float dir = Math.cos(ph * 0.5f) >= 0 ? 1 : -1;
+            if (k < hd.chickens) chicken(c, s.left + x * ws, s.top + y * hs, 0.075f * ws, dir, ph);
+            else chick(c, s.left + x * ws, s.top + y * hs + 0.01f * hs, 0.05f * ws, dir, ph);
+        }
     }
 
     private void fence(Canvas c, float x0, float x1, float yBase, float h) {

@@ -12,7 +12,9 @@ import com.farmharvest.game.GameView.Screen;
 
 /** Layout, state and buttons for the farm screen (shown after every level) and the booster store. */
 final class FarmHub {
-    static final int TAB_UPGRADES = 0, TAB_DECOR = 1;
+    static final int TAB_ANIMALS = 0, TAB_DECOR = 1;
+    /** Animals tab buttons: coop, barn, hatch, cow. */
+    static final int ANIMAL_ACTIONS = 4, CARD_COOP = 0, CARD_BARN = 1, CARD_HATCH = 2, CARD_COW = 3;
 
     private final GameView v;
 
@@ -42,13 +44,13 @@ final class FarmHub {
     /** Called when the farm is opened from the title or level menu. */
     void open() {
         result = false;
-        tab = TAB_UPGRADES;
+        tab = TAB_ANIMALS;
         layout();
     }
 
     void showResult() {
         result = true;
-        tab = TAB_UPGRADES;
+        tab = TAB_ANIMALS;
         layout();
     }
 
@@ -57,7 +59,7 @@ final class FarmHub {
         float y = v.topInset + m + hh + gap;
         titleY = y + 3.5f * u;
         if (result) {
-            banner.set(m, y, v.W - m, y + 25 * u);
+            banner.set(m, y, v.W - m, y + 34 * u);
             y = banner.bottom + gap;
         } else {
             y += 9 * u;
@@ -93,8 +95,14 @@ final class FarmHub {
         return new RectF(r.right - 31 * u, r.centerY() - 6 * u, r.right - 3 * u, r.centerY() + 6 * u);
     }
 
+    /** Cards shown on the current tab. */
     int cardCount() {
-        return tab == TAB_UPGRADES ? Farm.OUTPUTS : Farm.DECORS;
+        return Farm.DECORS;
+    }
+
+    /** Cards that can be tapped: on the animals tab the last two (herd and stock) are just readouts. */
+    int buttonCount() {
+        return tab == TAB_ANIMALS ? ANIMAL_ACTIONS : Farm.DECORS;
     }
 
     void build(Screen s) {
@@ -109,7 +117,8 @@ final class FarmHub {
                     v.buildButtons();
                 });
             }
-            for (int i = 0; i < cardCount(); i++) {
+            for (int i = 0; i < cardBtn.length; i++) cardBtn[i] = null;
+            for (int i = 0; i < buttonCount(); i++) {
                 final int idx = i;
                 cardBtn[i] = v.addHit(card[i], () -> buy(idx));
             }
@@ -145,25 +154,41 @@ final class FarmHub {
     private void buy(int i) {
         Progress p = v.progress;
         RectF c = card[i];
-        boolean ok;
-        if (tab == TAB_UPGRADES) {
-            if (p.outputCost(i) < 0) return;
-            ok = p.buyOutput(i);
+        String err;
+        String done;
+        if (tab == TAB_ANIMALS) {
+            switch (i) {
+                case CARD_COOP:
+                case CARD_BARN: {
+                    int h = i == CARD_COOP ? Farm.COOP : Farm.BARN;
+                    done = p.herd.house[h] == 0 ? "Built!" : "Upgraded!";
+                    err = p.buildHouse(h);
+                    break;
+                }
+                case CARD_HATCH:
+                    err = p.hatchChick();
+                    done = "Chick!";
+                    break;
+                default:
+                    err = p.buyCow();
+                    done = "Moo!";
+            }
         } else {
             if (p.decor[i]) return;
-            ok = p.buyDecor(i);
+            err = p.buyDecor(i) ? null : "Not enough coins";
+            done = "New!";
         }
-        if (ok) {
+        if (err == null) {
             v.sfx.powerUpMade();
             v.sfx.coin();
             float[] at = v.renderer.farm.itemCenter(tab == TAB_DECOR, i);
             v.fx.sparkle(at[0], at[1], v.u, v.cell);
             v.fx.sparkle(at[0] - 8 * v.u, at[1] + 4 * v.u, v.u, v.cell);
             v.fx.sparkle(at[0] + 8 * v.u, at[1] + 4 * v.u, v.u, v.cell);
-            v.fx.pop(tab == TAB_UPGRADES ? "Upgraded!" : "New!", Math.max(0.25f * v.W, Math.min(0.75f * v.W, at[0])), at[1] - 6 * v.u, 8 * v.u, 1.2f, 0xFFFFD43B, v.W * 0.8f);
+            v.fx.pop(done, Math.max(0.25f * v.W, Math.min(0.75f * v.W, at[0])), at[1] - 6 * v.u, 8 * v.u, 1.2f, 0xFFFFD43B, v.W * 0.8f);
         } else {
             v.sfx.badSwap();
-            v.fx.pop("Not enough coins", c.centerX(), c.centerY(), 5f * v.u, 1f, 0xFFFF7A66, v.W * 0.8f);
+            v.fx.pop(err, c.centerX(), c.centerY(), 5f * v.u, 1f, 0xFFFF7A66, v.W * 0.8f);
         }
     }
 

@@ -36,17 +36,26 @@ final class Level {
         return get(index, MOVES[index], SCALE[index]);
     }
 
-    static Level get(int index, int moves, int scale) {
-        int nk = 5;
-        int offset = (index * 3) % Art.CROPS;
-        int[] kinds = new int[nk];
-        for (int j = 0; j < nk; j++) kinds[j] = (offset + j) % Art.CROPS;
+    /** Crops that are only sold: everything that is not an animal stock tile. */
+    private static final int[] PLAIN = {0, 1, 2, 3, 4, 5, 7, 8, 11};
 
+    static Level get(int index, int moves, int scale) {
+        // Two rotating cash crops plus three of the four farm stock tiles, so the animals can always be fed.
+        // Hay is held back for the first two levels (no barn yet), then each stock takes a turn sitting out.
+        int[] kinds = new int[5];
+        kinds[0] = PLAIN[(2 * index) % PLAIN.length];
+        kinds[1] = PLAIN[(2 * index + 1) % PLAIN.length];
+        int skip = index < 2 ? Farm.HAY : (index - 2) % Farm.STOCKS;
+        int n = 2;
+        for (int s = 0; s < Farm.STOCKS; s++) if (s != skip) kinds[n++] = Farm.STOCK_TILE[s];
+
+        // goals alternate between a cash crop and a farm stock tile
+        int[] order = {0, 2, 1, 3};
         int ng = Math.min(2 + index / 4, 4);
         int[] gk = new int[ng];
         int[] gc = new int[ng];
         for (int j = 0; j < ng; j++) {
-            gk[j] = kinds[j];
+            gk[j] = kinds[order[j]];
             gc[j] = scale + 2 * j;
         }
         return new Level(index + 1, kinds, gk, gc, moves);

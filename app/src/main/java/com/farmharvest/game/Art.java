@@ -12,7 +12,7 @@ final class Art {
             R.drawable.crop_egg,
             R.drawable.crop_potato,
             R.drawable.crop_watermelon,
-            R.drawable.crop_milk,
+            R.drawable.crop_hay,
             R.drawable.crop_sunflower,
             R.drawable.crop_bee,
             R.drawable.crop_water,

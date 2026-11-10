@@ -59,7 +59,9 @@ public class GameView extends View {
     int bagTotal;
     int[] harvest = new int[Art.CROPS];
     /** This level's payout, split up for the result banner on the farm screen. */
-    int playCoins, saleCoins, farmPct;
+    int playCoins, saleCoins, animalCoins;
+    /** What the farm did when the last level ended (stock hauled in, animals fed). */
+    Farm.Report report = new Farm.Report();
     boolean hammerMode;
     final RectF[] boosterRect = {new RectF(), new RectF(), new RectF()};
 
@@ -648,8 +650,9 @@ public class GameView extends View {
         }
         playCoins = coins + bonus;
         saleCoins = Farm.saleValue(harvest);
-        farmPct = progress.bonusPct();
-        int payout = Farm.payout(playCoins, saleCoins, farmPct);
+        report = progress.farmRound(harvest);
+        animalCoins = report.coins;
+        int payout = Farm.payout(playCoins, saleCoins, animalCoins);
         landed += payout - coins;
         coins = payout;
         progress.levelFinished(levelIndex, stars, coins);

@@ -33,7 +33,6 @@ var specs = []spec{
 	{"sunflower", "sheet1", image.Rect(645, 270, 830, 515)},
 	{"water", "sheet1", image.Rect(840, 295, 1024, 515)},
 	{"pumpkin", "sheet2", image.Rect(20, 50, 235, 260)},
-	{"milk", "sheet2", image.Rect(640, 40, 800, 270)},
 	{"watermelon", "sheet2", image.Rect(600, 300, 830, 510)},
 	{"scarecrow", "specials", image.Rect(10, 95, 290, 475)},
 	{"tnt", "specials", image.Rect(295, 110, 480, 445)},

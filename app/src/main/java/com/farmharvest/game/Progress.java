@@ -10,7 +10,7 @@ final class Progress {
     final int[] bestStars = new int[Level.COUNT];
     final boolean[] tipSeen = new boolean[Art.COUNT];
     final int[] boosters = new int[Farm.BOOSTERS];
-    final int[] output = new int[Farm.OUTPUTS];
+    final Farm.Herd herd = new Farm.Herd();
     final boolean[] decor = new boolean[Farm.DECORS];
     private final SharedPreferences prefs;
 
@@ -22,15 +22,40 @@ final class Progress {
         for (int t = Art.CROPS; t < Art.COUNT; t++) tipSeen[t] = prefs.getBoolean("tip_" + t, false);
         for (int i = 0; i < Level.COUNT; i++) bestStars[i] = prefs.getInt("stars_" + i, 0);
         for (int i = 0; i < boosters.length; i++) boosters[i] = prefs.getInt("booster_" + i, 0);
-        for (int i = 0; i < output.length; i++) output[i] = prefs.getInt("output_" + i, 0);
         for (int i = 0; i < decor.length; i++) decor[i] = prefs.getBoolean("decor_" + i, false);
+        loadHerd();
+        refundOldUpgrades();
+    }
+
+    private void loadHerd() {
+        for (int i = 0; i < herd.stock.length; i++) herd.stock[i] = prefs.getInt("stock_" + i, 0);
+        for (int i = 0; i < herd.house.length; i++) herd.house[i] = prefs.getInt("house_" + i, 0);
+        for (int i = 0; i < herd.chicks.length; i++) herd.chicks[i] = prefs.getInt("chicks_" + i, 0);
+        herd.chickens = prefs.getInt("chickens", 0);
+        herd.cows = prefs.getInt("cows", 0);
+    }
+
+    /** The old flat-bonus output upgrades were replaced by animals: pay back what was spent on them, once. */
+    private void refundOldUpgrades() {
+        if (prefs.getBoolean("outputs_refunded", false)) return;
+        final int[][] oldCost = {{600, 1800, 4200}, {1000, 2600, 6000}, {1500, 3600, 7800}, {2200, 5400, 10800}};
+        SharedPreferences.Editor e = prefs.edit();
+        for (int k = 0; k < oldCost.length; k++) {
+            int lvl = Math.min(prefs.getInt("output_" + k, 0), 3);
+            for (int l = 0; l < lvl; l++) totalCoins += oldCost[k][l];
+            e.remove("output_" + k);
+        }
+        e.putInt("coins", totalCoins).putBoolean("outputs_refunded", true).apply();
     }
 
     private void saveShop() {
         SharedPreferences.Editor e = prefs.edit().putInt("coins", totalCoins);
         for (int i = 0; i < boosters.length; i++) e.putInt("booster_" + i, boosters[i]);
-        for (int i = 0; i < output.length; i++) e.putInt("output_" + i, output[i]);
         for (int i = 0; i < decor.length; i++) e.putBoolean("decor_" + i, decor[i]);
+        for (int i = 0; i < herd.stock.length; i++) e.putInt("stock_" + i, herd.stock[i]);
+        for (int i = 0; i < herd.house.length; i++) e.putInt("house_" + i, herd.house[i]);
+        for (int i = 0; i < herd.chicks.length; i++) e.putInt("chicks_" + i, herd.chicks[i]);
+        e.putInt("chickens", herd.chickens).putInt("cows", herd.cows);
         e.apply();
     }
 
@@ -57,22 +82,52 @@ final class Progress {
 
     // ---- farm
 
-    int bonusPct() {
-        return Farm.bonusPct(output);
+    /** Cost of building or upgrading a house, or -1 when it is fully upgraded. */
+    int houseCost(int h) {
+        return herd.house[h] >= Farm.MAX_HOUSE_LEVEL ? -1 : Farm.HOUSE_COST[h][herd.house[h]];
     }
 
-    /** Cost of the next level of an output upgrade, or -1 when it is fully upgraded. */
-    int outputCost(int k) {
-        return output[k] >= Farm.MAX_OUTPUT_LEVEL ? -1 : Farm.OUTPUT_COST[k][output[k]];
+    boolean houseUnlocked(int h) {
+        return unlocked >= Farm.HOUSE_UNLOCK_LEVEL[h];
     }
 
-    boolean buyOutput(int k) {
-        int cost = outputCost(k);
-        if (cost < 0 || totalCoins < cost) return false;
+    /** Builds or upgrades a house. Returns null on success, otherwise why it could not be done. */
+    String buildHouse(int h) {
+        int cost = houseCost(h);
+        if (cost < 0) return "Fully upgraded";
+        if (!houseUnlocked(h)) return "Beat level " + (Farm.HOUSE_UNLOCK_LEVEL[h] - 1) + " first";
+        if (totalCoins < cost) return "Not enough coins";
         totalCoins -= cost;
-        output[k]++;
+        herd.house[h]++;
         saveShop();
-        return true;
+        return null;
+    }
+
+    /** Turns 5 eggs into a chick. Returns null on success, otherwise why not. */
+    String hatchChick() {
+        if (herd.house[Farm.COOP] == 0) return "Build a coop first";
+        if (herd.stock[Farm.EGG] < Farm.EGGS_PER_CHICK) return "Need " + Farm.EGGS_PER_CHICK + " eggs";
+        if (herd.chickenRoom() <= 0) return "Coop is full";
+        herd.hatch();
+        saveShop();
+        return null;
+    }
+
+    String buyCow() {
+        if (herd.house[Farm.BARN] == 0) return "Build a barn first";
+        if (herd.cowRoom() <= 0) return "Barn is full";
+        if (totalCoins < Farm.COW_PRICE) return "Not enough coins";
+        totalCoins -= Farm.COW_PRICE;
+        herd.cows++;
+        saveShop();
+        return null;
+    }
+
+    /** Banks a level's harvest into the farm stock, feeds the animals and returns what happened. The coins are paid by the caller. */
+    Farm.Report farmRound(int[] harvest) {
+        Farm.Report rp = herd.endLevel(harvest);
+        saveShop();
+        return rp;
     }
 
     boolean buyDecor(int k) {
