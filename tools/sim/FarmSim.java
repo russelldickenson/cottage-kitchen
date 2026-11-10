@@ -16,23 +16,24 @@ final class FarmSim {
     private static void report(int campaigns, double skill, String name) {
         int n = Level.COUNT;
         double[] play = new double[n], animals = new double[n], bonus = new double[n], hungryRate = new double[n], streak = new double[n];
-        double[] chickens = new double[n], cows = new double[n], banked = new double[n];
+        double[] farmMoves = new double[n], chickens = new double[n], cows = new double[n], banked = new double[n];
         double[][] hauled = new double[n][Farm.STOCKS];
         for (int g = 0; g < campaigns; g++) {
             Farm.Herd h = new Farm.Herd();
             int coins = 0;
             for (int i = 0; i < n; i++) {
-                Level lv = Level.get(i);
+                Level lv = Level.get(i, h);
                 Arrays.fill(Sim.byType, 0);
                 Sim.levelCoins = 0;
                 int left, tries = 0;
                 do {
-                    left = Sim.playLevel(lv, skill);
+                    left = Sim.playLevel(lv, skill, h);
                     tries++;
                 } while (left < 0 && tries < 5);
                 int[] harvest = new int[Art.CROPS];
                 for (int t = 0; t < Art.CROPS; t++) harvest[t] = (int) Sim.byType[t];
-                int p = (int) Sim.levelCoins + Math.max(left, 0) * Rules.MOVE_BONUS + Farm.saleValue(harvest);
+                int p = (int) Sim.levelCoins + Sim.lastMovesLeft * Rules.MOVE_BONUS + Farm.saleValue(harvest);
+                farmMoves[i] += Sim.lastFarmMoves;
                 Farm.Report rp = h.endLevel(harvest);
                 play[i] += p;
                 animals[i] += rp.coins - rp.soldOverflow;
@@ -48,12 +49,12 @@ final class FarmSim {
             }
         }
         System.out.printf("%n%s bot, %d campaigns%n", name, campaigns);
-        System.out.println("lvl  play | animals (share, streak bonus) | hungry lvls | streak | hauled egg seed hay water | hens cows | banked");
+        System.out.println("lvl  play | animals (share, streak bonus) | hungry lvls | streak | hauled egg seed hay water | hens cows | farm moves | banked");
         for (int i = 0; i < n; i++) {
             double pl = play[i] / campaigns, an = animals[i] / campaigns;
-            System.out.printf("%3d %5.0f | %5.0f (%4.1f%%, %4.0f) | %9.0f%% | %6.1f | %12.0f %4.0f %4.0f %5.0f | %4.1f %4.1f | %6.0f%n", i + 1, pl, an, 100 * an / (pl + an), bonus[i] / campaigns,
+            System.out.printf("%3d %5.0f | %5.0f (%4.1f%%, %4.0f) | %9.0f%% | %6.1f | %12.0f %4.0f %4.0f %5.0f | %4.1f %4.1f | %10.1f | %6.0f%n", i + 1, pl, an, 100 * an / (pl + an), bonus[i] / campaigns,
                     100 * hungryRate[i] / campaigns, streak[i] / campaigns, hauled[i][0] / campaigns, hauled[i][1] / campaigns, hauled[i][2] / campaigns, hauled[i][3] / campaigns,
-                    chickens[i] / campaigns, cows[i] / campaigns, banked[i] / campaigns);
+                    chickens[i] / campaigns, cows[i] / campaigns, farmMoves[i] / campaigns, banked[i] / campaigns);
         }
     }
 

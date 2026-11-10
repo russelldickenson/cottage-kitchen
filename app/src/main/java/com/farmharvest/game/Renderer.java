@@ -156,6 +156,7 @@ final class Renderer {
         gfx.textC(c, String.valueOf(v.movesLeft), (ml + mr) / 2, hudTop + hh * 0.66f, hh * 0.52f,
                 v.movesLeft <= 3 ? 0xFFFF7A66 : Color.WHITE, 0xFF3A1F08, Paint.Align.CENTER);
 
+        if (v.farming && v.bankBtn != null) v.bankBtn.text = "BANK " + v.movesLeft + " MOVES  +" + v.movesLeft * Rules.MOVE_BONUS;
         drawGoals(c);
 
         // board
@@ -254,7 +255,12 @@ final class Renderer {
         gfx.rrect(c, p.left, p.top, p.right, p.bottom, 4 * v.u, WOOD);
         gfx.rrect(c, p.left + v.u * 0.8f, p.top + v.u * 0.8f, p.right - v.u * 0.8f, p.bottom - v.u * 0.8f, 3.4f * v.u, CREAM);
         if (v.level == null) return;
-        gfx.textC(c, "LEVEL " + v.level.number + " - HARVEST GOALS", p.centerX(), p.top + p.height() * 0.15f, 3.6f * v.u, 0xFF8B5A2B, 0, Paint.Align.CENTER);
+        boolean herdAnimals = v.progress.herd.chickens + v.progress.herd.cows + v.progress.herd.chickCount() > 0;
+        String title = v.farming ? "GOALS DONE - FARMING FOR THE HERD"
+                : v.level.herdGoal == Farm.EGG ? "LEVEL " + v.level.number + " - HATCH MORE CHICKS"
+                : v.level.herdGoal >= 0 && herdAnimals ? "LEVEL " + v.level.number + " - FEED THE HERD"
+                : "LEVEL " + v.level.number + " - HARVEST GOALS";
+        gfx.textC(c, title, p.centerX(), p.top + p.height() * 0.15f, 3.6f * v.u, v.farming ? 0xFF3E9E22 : 0xFF8B5A2B, 0, Paint.Align.CENTER);
         int n = v.level.goalKinds.length;
         float slot = (p.width() - 4 * v.u) / n;
         for (int i = 0; i < n; i++) {

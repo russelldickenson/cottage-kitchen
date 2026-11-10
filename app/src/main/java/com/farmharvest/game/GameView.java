@@ -12,6 +12,7 @@ import android.view.MotionEvent;
 import android.view.View;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
@@ -79,6 +80,10 @@ public class GameView extends View {
     int[] need = new int[Art.COUNT];
     int movesLeft, coins, landed, combo, stars, bonus;
     boolean won;
+    /** After the goals are done, spare moves can keep farming what the herd is short of. goalMoves is what was left when the goals finished. */
+    boolean farming;
+    int goalMoves;
+    Button bankBtn;
     float dispCoins, idleTime, clearTimer, time;
     Tile selected, swapA, swapB, downTile;
     int[] hint;
@@ -193,7 +198,11 @@ public class GameView extends View {
             });
         } else {
             addBack(m, topInset + m, hh, this::askQuit);
-            if (screen == Screen.PLAY && phase != Phase.BAG) {
+            bankBtn = null;
+            if (screen == Screen.PLAY && farming && phase != Phase.BAG) {
+                RectF r = boosterRect[1];
+                bankBtn = addWide(W / 2, r.centerY(), W * 0.78f, 14 * u, "BANK MOVES", ORANGE, this::bankMoves);
+            } else if (screen == Screen.PLAY && phase != Phase.BAG) {
                 for (int k = 0; k < Farm.BOOSTERS; k++) {
                     final int kind = k;
                     Button b = new Button();
@@ -334,7 +343,8 @@ public class GameView extends View {
     void startLevel(int idx) {
         levelIndex = idx;
         confirmQuit = false;
-        level = Level.get(idx);
+        level = Level.get(idx, progress.herd);
+        farming = false;
         board = new Board(COLS, ROWS, level.kinds, rnd);
         need = new int[Art.COUNT];
         for (int i = 0; i < level.goalKinds.length; i++) need[level.goalKinds[i]] = level.goalCounts[i];
@@ -600,28 +610,73 @@ public class GameView extends View {
     }
 
     private void afterSettle() {
-        if (Rules.goalsDone(need)) {
-            endLevel(true);
+        if (farming) {
+            // spare moves farm until the herd's shortfall is cleared or the moves run out; unused moves are banked
+            if (Rules.goalsDone(need) || movesLeft <= 0) endLevel(true);
+            else keepPlaying();
+        } else if (Rules.goalsDone(need)) {
+            if (movesLeft > 0 && startFarming()) keepPlaying();
+            else endLevel(true);
         } else if (movesLeft <= 0) {
             endLevel(false);
         } else {
-            if (board.findMove() == null) {
-                board.reshuffle();
-                for (Tile[] row : board.g) for (Tile t : row) t.scale = 0f;
-                sfx.swap();
-                addPop("Shuffle!", W / 2, by + cell * 3.5f, cell * 0.9f, 1.2f, 0xFF9BE15D);
-            }
-            phase = Phase.IDLE;
-            idleTime = 0;
-            hint = null;
-            if (pendingTip >= 0) {
-                tipType = pendingTip;
-                pendingTip = -1;
-                tipT = 0;
-                phase = Phase.TIP;
-                buildButtons();
+            keepPlaying();
+        }
+    }
+
+    private void keepPlaying() {
+        if (board.findMove() == null) {
+            board.reshuffle();
+            for (Tile[] row : board.g) for (Tile t : row) t.scale = 0f;
+            sfx.swap();
+            addPop("Shuffle!", W / 2, by + cell * 3.5f, cell * 0.9f, 1.2f, 0xFF9BE15D);
+        }
+        phase = Phase.IDLE;
+        idleTime = 0;
+        hint = null;
+        if (pendingTip >= 0) {
+            tipType = pendingTip;
+            pendingTip = -1;
+            tipT = 0;
+            phase = Phase.TIP;
+            buildButtons();
+        }
+    }
+
+    /**
+     * The goals are done with moves to spare: if the herd is still short of something that is on the board, the level
+     * carries on with that as the only goal. Returns false when there is nothing worth farming.
+     */
+    private boolean startFarming() {
+        Farm.Herd hd = progress.herd;
+        int[] kinds = new int[Farm.STOCKS], counts = new int[Farm.STOCKS];
+        int n = 0;
+        for (int s = 0; s < Farm.STOCKS; s++) {
+            int tile = Farm.STOCK_TILE[s], short_ = hd.shortfall(s, harvest[tile]);
+            boolean onBoard = false;
+            for (int k : level.kinds) onBoard |= k == tile;
+            if (short_ > 0 && onBoard) {
+                kinds[n] = tile;
+                counts[n++] = short_;
             }
         }
+        if (n == 0) return false;
+        farming = true;
+        goalMoves = movesLeft;
+        level = new Level(level.number, level.kinds, Arrays.copyOf(kinds, n), Arrays.copyOf(counts, n), level.moves);
+        need = new int[Art.COUNT];
+        for (int i = 0; i < n; i++) need[kinds[i]] = counts[i];
+        sfx.powerUpMade();
+        addPop("Goals done!", W / 2, by + cell * 1.8f, cell * 0.9f, 1.4f, 0xFFFFD43B);
+        addPop("Farm for the herd", W / 2, by + cell * 3.2f, cell * 0.75f, 1.4f, 0xFF9BE15D);
+        buildButtons();
+        return true;
+    }
+
+    /** Stops farming and takes the unused moves as coins. */
+    private void bankMoves() {
+        if (!farming || phase != Phase.IDLE) return;
+        endLevel(true);
     }
 
     private void startBag() {
@@ -646,7 +701,7 @@ public class GameView extends View {
         stars = 0;
         if (win) {
             bonus = movesLeft * Rules.MOVE_BONUS;
-            stars = Rules.stars(movesLeft, level.moves);
+            stars = Rules.stars(farming ? goalMoves : movesLeft, level.moves);
         }
         playCoins = coins + bonus;
         saleCoins = Farm.saleValue(harvest);

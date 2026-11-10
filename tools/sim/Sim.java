@@ -133,11 +133,50 @@ public class Sim {
 
     /** skill: 1.0 always plays the best goal move, 0.0 plays a random legal move. Returns moves left, or -1 on a loss. */
     static int playLevel(Level lv, double skill) {
+        return playLevel(lv, skill, null);
+    }
+
+    /** Moves left after the last playLevel (after any farming), and moves spent farming. */
+    static int lastMovesLeft, lastFarmMoves;
+
+    /**
+     * With a herd, spare moves after the goals keep farming whatever stock the herd is still short of (see GameView.startFarming).
+     * Returns the moves left when the goals were done (what the stars use), or -1 on a loss.
+     */
+    static int playLevel(Level lv, double skill, Farm.Herd herd) {
         powerUpsOn = lv.powerUps();
         Board b = new Board(COLS, ROWS, lv.kinds, rnd);
         State s = new State();
         for (int i = 0; i < lv.goalKinds.length; i++) s.need[lv.goalKinds[i]] = lv.goalCounts[i];
         s.moves = lv.moves;
+        runMoves(b, s, lv, skill);
+        lastFarmMoves = 0;
+        if (!s.done()) {
+            lastMovesLeft = 0;
+            return -1;
+        }
+        int atGoal = s.moves;
+        if (herd != null && s.moves > 0) {
+            boolean any = false;
+            for (int k = 0; k < Farm.STOCKS; k++) {
+                int tile = Farm.STOCK_TILE[k], missing = herd.shortfall(k, (int) byType[tile]);
+                boolean onBoard = false;
+                for (int kind : lv.kinds) onBoard |= kind == tile;
+                if (missing > 0 && onBoard) {
+                    s.need[tile] = missing;
+                    any = true;
+                }
+            }
+            if (any) {
+                runMoves(b, s, lv, skill);
+                lastFarmMoves = atGoal - s.moves;
+            }
+        }
+        lastMovesLeft = s.moves;
+        return atGoal;
+    }
+
+    private static void runMoves(Board b, State s, Level lv, double skill) {
         while (s.moves > 0 && !s.done()) {
             if (b.findMove() == null) b.reshuffle();
             List<int[]> ms = moves(b);
@@ -159,7 +198,6 @@ public class Sim {
             play(b, s, pick, true);
             counting = false;
         }
-        return s.done() ? s.moves : -1;
     }
 
     /** Moves an expert needs on average with an unlimited budget. */

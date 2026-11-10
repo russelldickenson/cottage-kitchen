@@ -40,7 +40,7 @@ final class Farm {
     /** Coins an animal that was fed (1 feed + 1 water) pays out after each level. */
     static final int CHICKEN_COINS = 15, COW_COINS = 45;
     /** What each animal eats per level. Water is shared by every animal. */
-    static final int CHICKEN_SEED = 1, CHICKEN_WATER = 1, COW_HAY = 2, COW_WATER = 2;
+    static final int CHICKEN_SEED = 2, CHICKEN_WATER = 2, COW_HAY = 4, COW_WATER = 3;
     /**
      * Fed streak: a level with the whole herd fed adds 1, a level with any hungry animal takes 2 off.
      * Every streak level adds STREAK_BONUS_PCT to what the animals pay, up to STREAK_MAX levels.
@@ -133,6 +133,31 @@ final class Farm {
         int cap(int stockKind) {
             if (stockKind == EGG) return EGG_CAP;
             return Math.max(MIN_FEED_CAP, (int) Math.ceil(FEED_CAP_LEVELS * needFor(stockKind, chickens + chickCount())));
+        }
+
+        /** Eggs worth banking: two chicks' worth while there is, or soon will be, room in the coop. */
+        private int eggWant() {
+            if (house[COOP] == 0) return 2 * EGGS_PER_CHICK;
+            return EGGS_PER_CHICK * Math.max(0, Math.min(chickenRoom(), 2));
+        }
+
+        /** How much of a stock the farm wants to have after the next level: feed for the herd, or eggs to hatch. */
+        int want(int stockKind) {
+            return stockKind == EGG ? eggWant() : need(stockKind);
+        }
+
+        /** How many more of a stock the farm still needs, given what is banked and what a level has hauled so far. */
+        int shortfall(int stockKind, int hauled) {
+            return Math.max(0, want(stockKind) - stock[stockKind] - hauled);
+        }
+
+        /** 0 (empty) to 1 (as full as the farm wants) for a stock. */
+        float fill(int stockKind) {
+            if (stockKind == EGG) {
+                int w = eggWant();
+                return w == 0 ? 1f : Math.min(1f, stock[EGG] / (float) w);
+            }
+            return Math.min(1f, stock[stockKind] / (float) cap(stockKind));
         }
 
         /** True when 5 eggs and a free spot in the coop are available. */

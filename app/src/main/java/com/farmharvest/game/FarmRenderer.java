@@ -249,19 +249,14 @@ final class FarmRenderer {
             gfx.textC(c, "Hens " + (hd.chickens + chicks) + "/" + Farm.capacity(Farm.COOP, hd.house[Farm.COOP]) + (chicks > 0 ? " (" + chicks + " chicks)" : ""),
                     lx, cd.top + hgt * 0.22f, 3.5f * u, INK, 0, Paint.Align.LEFT);
             gfx.textC(c, "Cows " + hd.cows + "/" + Farm.capacity(Farm.BARN, hd.house[Farm.BARN]), lx, cd.top + hgt * 0.5f, 3.5f * u, INK, 0, Paint.Align.LEFT);
-            boolean short_ = false;
-            for (int s = 1; s < Farm.STOCKS; s++) short_ |= hd.need(s) > hd.stock[s];
             String status;
             int col;
             if (hd.chickens + hd.cows == 0) {
                 status = "Hatch eggs to start";
                 col = 0xFF8B5A2B;
-            } else if (short_) {
-                status = hd.streak > 0 ? "Low! Streak at risk" : "Low on feed!";
-                col = RED;
             } else {
-                status = hd.streak > 0 ? "Streak " + hd.streak + "  +" + Farm.streakPct(hd.streak) + "%" : "All fed";
-                col = 0xFF3E9E22;
+                status = hd.streak > 0 ? "Fed streak " + hd.streak + "  +" + Farm.streakPct(hd.streak) + "%" : "No streak yet";
+                col = hd.streak > 0 ? 0xFF3E9E22 : 0xFF8B5A2B;
             }
             gfx.textC(c, status, lx, cd.top + hgt * 0.78f, 3.5f * u, col, 0, Paint.Align.LEFT);
             return;
@@ -270,7 +265,7 @@ final class FarmRenderer {
             float x = s % 2 == 0 ? cd.left + 3 * u : cd.left + cd.width() / 2 + 0.5f * u, y = cd.top + hgt * (s < 2 ? 0.3f : 0.72f);
             r.drawIcon(c, Farm.STOCK_TILE[s], x + 3.5f * u, y, 7.5f * u);
             int need = hd.need(s), have = hd.stock[s];
-            gfx.textC(c, need > 0 ? have + "/" + need : String.valueOf(have), x + 8 * u, y, 3.8f * u, need > have ? RED : INK, 0, Paint.Align.LEFT);
+            gfx.textC(c, need > 0 ? have + "/" + need : String.valueOf(have), x + 8 * u, y, 3.8f * u, need > have ? 0xFFD9822B : INK, 0, Paint.Align.LEFT);
         }
     }
 
