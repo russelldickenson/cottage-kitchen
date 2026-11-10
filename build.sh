@@ -60,3 +60,5 @@ if [[ -n "${APKSIGNER[1]:-}" ]]; then
 fi
 
 print "\nSigned APK: $APK"
+
+cp app/build/outputs/apk/release/app-release.apk farm-harvest.apk
