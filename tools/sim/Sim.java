@@ -232,9 +232,10 @@ public class Sim {
                 System.out.printf("%5d %5d | %15.1f | %15.0f | %11.0f | %14.0f | %d%n", i + 1, lv.moves, crops, sale, coins, income, cum);
             }
             int houses = 0, dec = 0;
-            for (int[] row : Farm.HOUSE_COST) for (int cost : row) houses += cost;
+            for (int sp = 0; sp < Farm.SPECIES; sp++) for (int l = 0; l < Farm.MAX_HOUSE_LEVEL; l++) houses += Farm.houseCost(sp, l);
+            for (int sp = 1; sp < Farm.SPECIES; sp++) houses += Farm.animalPrice(sp) * Farm.capacity(sp, Farm.MAX_HOUSE_LEVEL);
             for (int cost : Farm.DECOR_COST) dec += cost;
-            System.out.println("Coop and barn upgrades cost " + houses + ", decorations " + dec + ", total " + (houses + dec) + " coins (animals extra).");
+            System.out.println("Houses and animals cost " + houses + ", decorations " + dec + ", total " + (houses + dec) + " coins.");
             return;
         }
         if (args.length > 1 && args[1].equals("farm")) {

@@ -1,12 +1,15 @@
 package com.farmharvest.game;
 
-/** Farm economy: crop prices, the livestock herd (eggs, feed, coop, barn, chickens, cows), decorations and boosters. No Android types. */
+/**
+ * Farm economy: crop prices, the livestock (five species, each with its own house, feed and payout), decorations and
+ * boosters. No Android types.
+ */
 final class Farm {
     /**
      * What one harvested crop sells for at the end of a level, indexed by crop id.
-     * Eggs, hay, sunflower seed and water are 0: they go into the farm stock instead (see STOCK_TILE).
+     * Eggs, potatoes, hay, sunflower seed and water are 0: they go into the farm stock instead (see STOCK_TILE).
      */
-    static final int[] BASE_PRICE = {8, 10, 8, 12, 8, 16, 0, 6, 18, 0, 0, 20, 0};
+    static final int[] BASE_PRICE = {8, 10, 8, 12, 8, 16, 0, 0, 18, 0, 0, 20, 0};
 
     // boosters
     static final int MOVES = 0, SHUFFLE = 1, HAMMER = 2, BOOSTERS = 3;
@@ -16,45 +19,53 @@ final class Farm {
     static final int EXTRA_MOVES = 5;
 
     // ---- farm stock: tiles cleared on the board that are kept for the animals
-    static final int EGG = 0, SEED = 1, HAY = 2, WATER = 3, STOCKS = 4;
+    static final int EGG = 0, SEED = 1, HAY = 2, WATER = 3, POTATO = 4, STOCKS = 5;
     /** The tile type (Art id) that fills each stock. */
-    static final int[] STOCK_TILE = {6, 10, 9, 12};
-    static final String[] STOCK_NAME = {"Eggs", "Seed", "Hay", "Water"};
+    static final int[] STOCK_TILE = {6, 10, 9, 12, 7};
+    static final String[] STOCK_NAME = {"Eggs", "Seed", "Hay", "Water", "Potatoes"};
     /** Eggs keep up to EGG_CAP. Feed keeps up to FEED_CAP_LEVELS levels of the herd's need (at least MIN_FEED_CAP). Above that is sold at OVERFLOW_PRICE each. */
     static final int EGG_CAP = 60, MIN_FEED_CAP = 10, OVERFLOW_PRICE = 2;
-    static final float FEED_CAP_LEVELS = 2.5f;
+    static final float FEED_CAP_LEVELS = 2.25f;
 
-    // ---- housing
-    static final int COOP = 0, BARN = 1, HOUSES = 2;
-    static final String[] HOUSE_NAME = {"Coop", "Barn"};
-    /** Price of building each house (level 1) and upgrading it (levels 2 and 3). */
-    static final int[][] HOUSE_COST = {{300, 800, 1800}, {800, 1800, 3600}};
-    /** Animals each house holds at level 1, 2, 3. */
-    static final int[][] HOUSE_CAPACITY = {{4, 8, 12}, {2, 4, 6}};
+    // ---- species. Each has one house of the same index.
+    static final int CHICKEN = 0, COW = 1, PIG = 2, SHEEP = 3, BEE = 4, SPECIES = 5;
+    static final String[] HOUSE_NAME = {"Coop", "Barn", "Pig Sty", "Sheep Pen", "Beehive"};
+    static final String[] ANIMAL_NAME = {"Hens", "Cows", "Pigs", "Sheep", "Bees"};
     /** A house can only be built once this level has been reached. */
-    static final int[] HOUSE_UNLOCK_LEVEL = {1, 4};
+    static final int[] HOUSE_UNLOCK_LEVEL = {1, 4, 7, 10, 13};
+    /** Animals each house holds at level 1, 2, 3. */
+    static final int[][] HOUSE_CAPACITY = {{4, 8, 12}, {2, 4, 6}, {2, 4, 6}, {3, 6, 9}, {3, 6, 9}};
     static final int MAX_HOUSE_LEVEL = 3;
+    /** Coins a fed animal pays out after each level, before the streak bonus. */
+    static final int[] COINS = {15, 80, 60, 50, 35};
+    /** What each animal eats per level, per stock (EGG is never eaten). Water is shared by every animal. */
+    static final int[][] FEED = {
+            {0, 1, 0, 1, 0},   // hen: seed, water
+            {0, 0, 2, 2, 0},   // cow: hay, water
+            {0, 0, 0, 2, 3},   // pig: potatoes, water
+            {0, 0, 1, 1, 0},   // sheep: hay, water
+            {0, 1, 0, 1, 0},   // bee: seed, water
+    };
+    /** Pricing is by payback: an animal costs ANIMAL_PAYBACK levels of its payout, and a house level HOUSE_PAYBACK levels of the extra payout it unlocks. */
+    static final int ANIMAL_PAYBACK = 8, HOUSE_PAYBACK = 10;
+    static final int EGGS_PER_CHICK = 5, CHICK_GROW_LEVELS = 1;
+    /** Feeding order: the best payers get the shared water first. */
+    private static final int[] FEED_ORDER = {COW, PIG, SHEEP, BEE, CHICKEN};
 
-    // ---- animals
-    static final int EGGS_PER_CHICK = 5, CHICK_GROW_LEVELS = 2, COW_PRICE = 500;
-    /** Coins an animal that was fed (1 feed + 1 water) pays out after each level. */
-    static final int CHICKEN_COINS = 15, COW_COINS = 45;
-    /** What each animal eats per level. Water is shared by every animal. */
-    static final int CHICKEN_SEED = 2, CHICKEN_WATER = 2, COW_HAY = 4, COW_WATER = 3;
     /**
      * Fed streak: a level with the whole herd fed adds 1, a level with any hungry animal takes 2 off.
      * Every streak level adds STREAK_BONUS_PCT to what the animals pay, up to STREAK_MAX levels.
      */
     static final int STREAK_MAX = 10, STREAK_BONUS_PCT = 10, STREAK_LOSS = 2;
 
-    static int streakPct(int streak) {
-        return Math.min(streak, STREAK_MAX) * STREAK_BONUS_PCT;
-    }
-
     // purely cosmetic
     static final int FENCE = 0, FLOWERS = 1, POND = 2, OAK = 3, WINDMILL = 4, BALLOON = 5, DECORS = 6;
     static final String[] DECOR_NAME = {"Fence", "Flowers", "Pond", "Oak Tree", "Windmill", "Balloon"};
     static final int[] DECOR_COST = {500, 900, 1500, 2300, 3300, 5000};
+
+    static int streakPct(int streak) {
+        return Math.min(streak, STREAK_MAX) * STREAK_BONUS_PCT;
+    }
 
     /** Stock index a cleared tile type goes to, or -1 when the crop is sold instead. */
     static int stockOf(int tileType) {
@@ -62,8 +73,20 @@ final class Farm {
         return -1;
     }
 
-    static int capacity(int house, int level) {
-        return level <= 0 ? 0 : HOUSE_CAPACITY[house][Math.min(level, MAX_HOUSE_LEVEL) - 1];
+    static int capacity(int species, int level) {
+        return level <= 0 ? 0 : HOUSE_CAPACITY[species][Math.min(level, MAX_HOUSE_LEVEL) - 1];
+    }
+
+    /** Price of building a house (level 0 to 1) or upgrading it, or -1 when it is fully upgraded. */
+    static int houseCost(int species, int level) {
+        if (level >= MAX_HOUSE_LEVEL) return -1;
+        int extra = capacity(species, level + 1) - capacity(species, level);
+        return Math.round(HOUSE_PAYBACK * extra * COINS[species] / 50f) * 50;
+    }
+
+    /** Price of one animal bought with coins. Hens are hatched from eggs and cost none. */
+    static int animalPrice(int species) {
+        return species == CHICKEN ? 0 : ANIMAL_PAYBACK * COINS[species];
     }
 
     /** Coins from selling the crops harvested in a level (stock tiles are not sold). */
@@ -82,7 +105,8 @@ final class Farm {
     static final class Report {
         /** Tiles brought in from the board, per stock (before the cap). */
         final int[] hauled = new int[STOCKS];
-        int chickensFed, cowsFed, hungry, grown, coins, soldOverflow;
+        final int[] fed = new int[SPECIES];
+        int hungry, grown, coins, soldOverflow;
         /** Fed streak after this level, and the payout bonus it earned this level. */
         int streak, bonusPct, bonusCoins;
     }
@@ -90,10 +114,10 @@ final class Farm {
     /** The animals and what they eat. */
     static final class Herd {
         final int[] stock = new int[STOCKS];
-        final int[] house = new int[HOUSES];
-        /** Chicks hatched in the last level, and chicks that have grown for one level. */
+        final int[] house = new int[SPECIES];
+        final int[] count = new int[SPECIES];
+        /** Chicks hatched in the last level, waiting to grow into hens (CHICK_GROW_LEVELS levels). */
         final int[] chicks = new int[CHICK_GROW_LEVELS];
-        int chickens, cows;
         /** Levels in a row the whole herd was fed (see STREAK_LOSS). */
         int streak;
 
@@ -103,42 +127,38 @@ final class Farm {
             return n;
         }
 
-        int chickenRoom() {
-            return capacity(COOP, house[COOP]) - chickens - chickCount();
+        int animals() {
+            int n = chickCount();
+            for (int c : count) n += c;
+            return n;
         }
 
-        int cowRoom() {
-            return capacity(BARN, house[BARN]) - cows;
+        /** Free places in a species' house. Chicks take a hen's place. */
+        int room(int species) {
+            return capacity(species, house[species]) - count[species] - (species == CHICKEN ? chickCount() : 0);
         }
 
-        private int needFor(int stockKind, int hens) {
-            switch (stockKind) {
-                case SEED:
-                    return hens * CHICKEN_SEED;
-                case HAY:
-                    return cows * COW_HAY;
-                case WATER:
-                    return hens * CHICKEN_WATER + cows * COW_WATER;
-                default:
-                    return 0;
-            }
+        private int needFor(int stockKind, boolean withChicks) {
+            int n = 0;
+            for (int sp = 0; sp < SPECIES; sp++) n += (count[sp] + (withChicks && sp == CHICKEN ? chickCount() : 0)) * FEED[sp][stockKind];
+            return n;
         }
 
         /** Stock of each kind the animals need to be fully fed after the next level. */
         int need(int stockKind) {
-            return needFor(stockKind, chickens);
+            return needFor(stockKind, false);
         }
 
         /** The most of a stock the farm keeps. Chicks count as hens, since they will be eating soon. */
         int cap(int stockKind) {
             if (stockKind == EGG) return EGG_CAP;
-            return Math.max(MIN_FEED_CAP, (int) Math.ceil(FEED_CAP_LEVELS * needFor(stockKind, chickens + chickCount())));
+            return Math.max(MIN_FEED_CAP, (int) Math.ceil(FEED_CAP_LEVELS * needFor(stockKind, true)));
         }
 
         /** Eggs worth banking: two chicks' worth while there is, or soon will be, room in the coop. */
         private int eggWant() {
-            if (house[COOP] == 0) return 2 * EGGS_PER_CHICK;
-            return EGGS_PER_CHICK * Math.max(0, Math.min(chickenRoom(), 2));
+            if (house[CHICKEN] == 0) return 2 * EGGS_PER_CHICK;
+            return EGGS_PER_CHICK * Math.max(0, Math.min(room(CHICKEN), 2));
         }
 
         /** How much of a stock the farm wants to have after the next level: feed for the herd, or eggs to hatch. */
@@ -162,7 +182,7 @@ final class Farm {
 
         /** True when 5 eggs and a free spot in the coop are available. */
         boolean canHatch() {
-            return stock[EGG] >= EGGS_PER_CHICK && chickenRoom() > 0;
+            return stock[EGG] >= EGGS_PER_CHICK && room(CHICKEN) > 0;
         }
 
         void hatch() {
@@ -170,7 +190,7 @@ final class Farm {
             chicks[0]++;
         }
 
-        /** The end-of-level farm step: bank the harvest, feed and milk the herd, grow the chicks. */
+        /** The end-of-level farm step: bank the harvest, feed and pay the herd, grow the chicks. */
         Report endLevel(int[] harvest) {
             Report rp = new Report();
             for (int t = 0; t < harvest.length; t++) {
@@ -188,24 +208,25 @@ final class Farm {
             }
             rp.coins += rp.soldOverflow;
 
-            // cows come first: they pay more for the shared water
-            rp.cowsFed = Math.min(cows, Math.min(stock[HAY] / COW_HAY, stock[WATER] / COW_WATER));
-            stock[HAY] -= rp.cowsFed * COW_HAY;
-            stock[WATER] -= rp.cowsFed * COW_WATER;
-            rp.chickensFed = Math.min(chickens, Math.min(stock[SEED] / CHICKEN_SEED, stock[WATER] / CHICKEN_WATER));
-            stock[SEED] -= rp.chickensFed * CHICKEN_SEED;
-            stock[WATER] -= rp.chickensFed * CHICKEN_WATER;
-            rp.hungry = cows - rp.cowsFed + chickens - rp.chickensFed;
-            int base = rp.cowsFed * COW_COINS + rp.chickensFed * CHICKEN_COINS;
+            int base = 0, animals = 0;
+            for (int sp : FEED_ORDER) {
+                int fed = count[sp];
+                for (int s = 0; s < STOCKS; s++) if (FEED[sp][s] > 0) fed = Math.min(fed, stock[s] / FEED[sp][s]);
+                for (int s = 0; s < STOCKS; s++) stock[s] -= fed * FEED[sp][s];
+                rp.fed[sp] = fed;
+                rp.hungry += count[sp] - fed;
+                animals += count[sp];
+                base += fed * COINS[sp];
+            }
 
-            if (chickens + cows > 0) streak = rp.hungry == 0 ? Math.min(streak + 1, STREAK_MAX) : Math.max(0, streak - STREAK_LOSS);
+            if (animals > 0) streak = rp.hungry == 0 ? Math.min(streak + 1, STREAK_MAX) : Math.max(0, streak - STREAK_LOSS);
             rp.streak = streak;
             rp.bonusPct = streakPct(streak);
             rp.bonusCoins = Math.round(base * rp.bonusPct / 100f);
             rp.coins += base + rp.bonusCoins;
 
             rp.grown = chicks[chicks.length - 1];
-            chickens += rp.grown;
+            count[CHICKEN] += rp.grown;
             for (int i = chicks.length - 1; i > 0; i--) chicks[i] = chicks[i - 1];
             chicks[0] = 0;
             return rp;

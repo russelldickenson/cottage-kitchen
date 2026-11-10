@@ -39,7 +39,10 @@ final class Level {
     }
 
     /** Crops that are only sold: everything that is not an animal stock tile. */
-    private static final int[] PLAIN = {0, 1, 2, 3, 4, 5, 7, 8, 11};
+    private static final int[] PLAIN = {0, 1, 2, 3, 4, 5, 8, 11};
+
+    /** How many of the farm's stock tiles share the board with the cash crops. */
+    private static final int STOCKS_ON_BOARD = 3;
 
     /** The level for this stage of the farm. */
     static Level get(int index, Farm.Herd herd) {
@@ -51,71 +54,54 @@ final class Level {
     }
 
     /**
-     * Two rotating cash crops plus three of the four farm stock tiles. With no herd (the simulator's tuning runs) the
-     * stock that sits out rotates. With a herd, the stock the herd is shortest of becomes the level's stock goal, sized
-     * to the shortfall, and the stock that is fullest sits out, so a hungry herd can always be fixed on the board.
+     * Cash crops plus the stock tiles the herd cares about. The stock the herd is shortest of becomes the level's stock
+     * goal, sized to the shortfall; the other stock tiles on the board are the next most needed, so a hungry herd can
+     * always be fixed on the board. With no herd (the simulator's tuning runs) it behaves like a new farm.
      */
     static Level get(int index, int moves, int scale, Farm.Herd herd) {
+        if (herd == null) herd = new Farm.Herd();
+        // a species' feed is worth carrying once its house is built or about to unlock
+        boolean[] relevant = new boolean[Farm.STOCKS];
+        relevant[Farm.EGG] = true;
+        for (int sp = 0; sp < Farm.SPECIES; sp++) {
+            if (herd.house[sp] == 0 && index + 2 < Farm.HOUSE_UNLOCK_LEVEL[sp]) continue;
+            for (int s = 0; s < Farm.STOCKS; s++) if (Farm.FEED[sp][s] > 0) relevant[s] = true;
+        }
+        // priority: how much of its want is still missing, then how empty it is
+        float[] score = new float[Farm.STOCKS], key = new float[Farm.STOCKS];
+        for (int s = 0; s < Farm.STOCKS; s++) {
+            int want = herd.want(s);
+            score[s] = want == 0 ? 0 : herd.shortfall(s, 0) / (float) want;
+            key[s] = score[s] + 0.01f * (1f - herd.fill(s));
+        }
+        int[] chosen = new int[STOCKS_ON_BOARD];
+        int n = 0;
+        boolean[] taken = new boolean[Farm.STOCKS];
+        while (n < STOCKS_ON_BOARD) {
+            int best = -1;
+            for (int k = 0; k < Farm.STOCKS; k++) {
+                int s = (index + k) % Farm.STOCKS;
+                if (relevant[s] && !taken[s] && (best < 0 || key[s] > key[best])) best = s;
+            }
+            if (best < 0) break;
+            taken[best] = true;
+            chosen[n++] = best;
+        }
+        int target = chosen[0], herdGoal = score[target] > 0 ? target : -1;
+        int stockGoal = scale + 2;
+        if (herdGoal >= 0) stockGoal = Math.max((int) Math.ceil(0.75 * scale), Math.min(scale + 2, herd.shortfall(target, 0)));
+
+        // kinds: a cash crop, the stock goal, the other stocks, then more cash crops to make five
         int[] kinds = new int[5];
         kinds[0] = PLAIN[(2 * index) % PLAIN.length];
-        kinds[1] = PLAIN[(2 * index + 1) % PLAIN.length];
-        int stockGoal = scale + 2, herdGoal = -1;
-        int target, skip;
-        if (herd == null) {
-            skip = index < 2 ? Farm.HAY : (index - 2) % Farm.STOCKS;
-            target = (skip + 1) % Farm.STOCKS;
-        } else {
-            boolean noBarnYet = herd.house[Farm.BARN] == 0 && index < 3;
-            float best = 0;
-            target = -1;
-            for (int k = 0; k < Farm.STOCKS; k++) {
-                int s = (index + k) % Farm.STOCKS;
-                if (s == Farm.HAY && noBarnYet) continue;
-                int want = herd.want(s);
-                float score = want == 0 ? 0 : herd.shortfall(s, 0) / (float) want;
-                if (score > best) {
-                    best = score;
-                    target = s;
-                }
-            }
-            if (target >= 0) {
-                herdGoal = target;
-                stockGoal = Math.max((int) Math.ceil(0.75 * scale), Math.min(scale + 2, herd.shortfall(target, 0)));
-            } else {
-                // nothing is short: top up whichever stock is emptiest
-                float low = 2;
-                for (int k = 0; k < Farm.STOCKS; k++) {
-                    int s = (index + k) % Farm.STOCKS;
-                    float f = s == Farm.HAY && noBarnYet ? 1f : herd.fill(s);
-                    if (f < low) {
-                        low = f;
-                        target = s;
-                    }
-                }
-            }
-            skip = -1;
-            float high = -1;
-            for (int k = 0; k < Farm.STOCKS; k++) {
-                int s = (index + k) % Farm.STOCKS;
-                if (s == target) continue;
-                float f = s == Farm.HAY && noBarnYet ? 2f : herd.fill(s);
-                if (f > high) {
-                    high = f;
-                    skip = s;
-                }
-            }
-        }
-        kinds[2] = Farm.STOCK_TILE[target];
-        int n = 3;
-        for (int s = 0; s < Farm.STOCKS; s++) if (s != skip && s != target) kinds[n++] = Farm.STOCK_TILE[s];
+        for (int i = 0; i < n; i++) kinds[1 + i] = Farm.STOCK_TILE[chosen[i]];
+        for (int i = 1 + n; i < 5; i++) kinds[i] = PLAIN[(2 * index + i - n) % PLAIN.length];
 
-        // goals alternate between a cash crop and the stock goal
-        int[] order = {0, 2, 1, 3};
         int ng = Math.min(2 + index / 4, 4);
         int[] gk = new int[ng];
         int[] gc = new int[ng];
         for (int j = 0; j < ng; j++) {
-            gk[j] = kinds[order[j]];
+            gk[j] = kinds[j];
             gc[j] = j == 1 ? stockGoal : scale + 2 * j;
         }
         Level lv = new Level(index + 1, kinds, gk, gc, moves);

@@ -13,8 +13,8 @@ import com.farmharvest.game.GameView.Screen;
 /** Layout, state and buttons for the farm screen (shown after every level) and the booster store. */
 final class FarmHub {
     static final int TAB_ANIMALS = 0, TAB_DECOR = 1;
-    /** Animals tab buttons: coop, barn, hatch, cow. */
-    static final int ANIMAL_ACTIONS = 4, CARD_COOP = 0, CARD_BARN = 1, CARD_HATCH = 2, CARD_COW = 3;
+    /** Animals tab: one card per species (coop, barn, sty, pen, hive), then a read-only streak card. */
+    static final int ANIMAL_ACTIONS = Farm.SPECIES, CARD_STREAK = Farm.SPECIES;
 
     private final GameView v;
 
@@ -22,7 +22,7 @@ final class FarmHub {
     boolean result;
     int tab;
 
-    final RectF banner = new RectF(), scene = new RectF(), shopRect = new RectF();
+    final RectF banner = new RectF(), scene = new RectF(), shopRect = new RectF(), stockStrip = new RectF();
     final RectF[] tabRect = {new RectF(), new RectF()};
     final RectF[] card = new RectF[Farm.DECORS];
     final Button[] cardBtn = new Button[Farm.DECORS];
@@ -70,11 +70,13 @@ final class FarmHub {
         float cardsBottom = result ? bottom - btnH - gap : bottom;
         float avail = cardsBottom - y;
         float sceneWant = 0.62f * (v.W - 2 * m);
-        float cardH = Math.max(15 * u, Math.min(25 * u, (avail - tabH - 4 * gap - sceneWant) / 3f));
-        float sceneH = Math.min(0.9f * (v.W - 2 * m), avail - tabH - 4 * gap - 3 * cardH);
+        float cardH = Math.max(15 * u, Math.min(25 * u, (avail - tabH - 9.5f * u - 5 * gap - sceneWant) / 3f));
+        float stripH = 9.5f * u;
+        float sceneH = Math.min(0.9f * (v.W - 2 * m), avail - tabH - stripH - 5 * gap - 3 * cardH);
         scene.set(m, y, v.W - m, y + sceneH);
+        stockStrip.set(m, scene.bottom + gap, v.W - m, scene.bottom + gap + stripH);
 
-        float tabTop = scene.bottom + gap, tw = (v.W - 2 * m - gap) / 2f;
+        float tabTop = stockStrip.bottom + gap, tw = (v.W - 2 * m - gap) / 2f;
         tabRect[0].set(m, tabTop, m + tw, tabTop + tabH);
         tabRect[1].set(m + tw + gap, tabTop, v.W - m, tabTop + tabH);
 
@@ -157,22 +159,9 @@ final class FarmHub {
         String err;
         String done;
         if (tab == TAB_ANIMALS) {
-            switch (i) {
-                case CARD_COOP:
-                case CARD_BARN: {
-                    int h = i == CARD_COOP ? Farm.COOP : Farm.BARN;
-                    done = p.herd.house[h] == 0 ? "Built!" : "Upgraded!";
-                    err = p.buildHouse(h);
-                    break;
-                }
-                case CARD_HATCH:
-                    err = p.hatchChick();
-                    done = "Chick!";
-                    break;
-                default:
-                    err = p.buyCow();
-                    done = "Moo!";
-            }
+            int act = p.nextAction(i);
+            done = act == Progress.ACT_BUILD ? "Built!" : act == Progress.ACT_UPGRADE ? "Upgraded!" : act == Progress.ACT_HATCH ? "Chick!" : "Welcome!";
+            err = p.tend(i);
         } else {
             if (p.decor[i]) return;
             err = p.buyDecor(i) ? null : "Not enough coins";

@@ -31,8 +31,11 @@ final class Progress {
         for (int i = 0; i < herd.stock.length; i++) herd.stock[i] = prefs.getInt("stock_" + i, 0);
         for (int i = 0; i < herd.house.length; i++) herd.house[i] = prefs.getInt("house_" + i, 0);
         for (int i = 0; i < herd.chicks.length; i++) herd.chicks[i] = prefs.getInt("chicks_" + i, 0);
-        herd.chickens = prefs.getInt("chickens", 0);
-        herd.cows = prefs.getInt("cows", 0);
+        // saves from before the other animals: hens and cows lived under their own keys, and chicks took two levels to grow
+        herd.count[Farm.CHICKEN] = prefs.getInt("count_0", prefs.getInt("chickens", 0));
+        herd.count[Farm.COW] = prefs.getInt("count_1", prefs.getInt("cows", 0));
+        for (int i = Farm.COW + 1; i < herd.count.length; i++) herd.count[i] = prefs.getInt("count_" + i, 0);
+        herd.chicks[0] += prefs.getInt("chicks_1", 0);
         herd.streak = prefs.getInt("streak", 0);
     }
 
@@ -56,7 +59,8 @@ final class Progress {
         for (int i = 0; i < herd.stock.length; i++) e.putInt("stock_" + i, herd.stock[i]);
         for (int i = 0; i < herd.house.length; i++) e.putInt("house_" + i, herd.house[i]);
         for (int i = 0; i < herd.chicks.length; i++) e.putInt("chicks_" + i, herd.chicks[i]);
-        e.putInt("chickens", herd.chickens).putInt("cows", herd.cows).putInt("streak", herd.streak);
+        for (int i = 0; i < herd.count.length; i++) e.putInt("count_" + i, herd.count[i]);
+        e.remove("chicks_1").putInt("streak", herd.streak);
         e.apply();
     }
 
@@ -83,43 +87,54 @@ final class Progress {
 
     // ---- farm
 
-    /** Cost of building or upgrading a house, or -1 when it is fully upgraded. */
-    int houseCost(int h) {
-        return herd.house[h] >= Farm.MAX_HOUSE_LEVEL ? -1 : Farm.HOUSE_COST[h][herd.house[h]];
+    /** What tapping a species' card does next, in the order a farm grows. */
+    static final int ACT_LOCKED = 0, ACT_BUILD = 1, ACT_HATCH = 2, ACT_NEED_EGGS = 3, ACT_BUY = 4, ACT_UPGRADE = 5, ACT_FULL = 6;
+
+    boolean houseUnlocked(int sp) {
+        return unlocked >= Farm.HOUSE_UNLOCK_LEVEL[sp];
     }
 
-    boolean houseUnlocked(int h) {
-        return unlocked >= Farm.HOUSE_UNLOCK_LEVEL[h];
+    int nextAction(int sp) {
+        if (!houseUnlocked(sp)) return ACT_LOCKED;
+        if (herd.house[sp] == 0) return ACT_BUILD;
+        if (herd.room(sp) > 0) return sp == Farm.CHICKEN ? (herd.canHatch() ? ACT_HATCH : ACT_NEED_EGGS) : ACT_BUY;
+        return herd.house[sp] < Farm.MAX_HOUSE_LEVEL ? ACT_UPGRADE : ACT_FULL;
     }
 
-    /** Builds or upgrades a house. Returns null on success, otherwise why it could not be done. */
-    String buildHouse(int h) {
-        int cost = houseCost(h);
-        if (cost < 0) return "Fully upgraded";
-        if (!houseUnlocked(h)) return "Beat level " + (Farm.HOUSE_UNLOCK_LEVEL[h] - 1) + " first";
-        if (totalCoins < cost) return "Not enough coins";
-        totalCoins -= cost;
-        herd.house[h]++;
-        saveShop();
-        return null;
+    /** Coins the next action costs, or 0 when it is free or not available. */
+    int actionPrice(int sp) {
+        switch (nextAction(sp)) {
+            case ACT_BUILD:
+            case ACT_UPGRADE:
+                return Farm.houseCost(sp, herd.house[sp]);
+            case ACT_BUY:
+                return Farm.animalPrice(sp);
+            default:
+                return 0;
+        }
     }
 
-    /** Turns 5 eggs into a chick. Returns null on success, otherwise why not. */
-    String hatchChick() {
-        if (herd.house[Farm.COOP] == 0) return "Build a coop first";
-        if (herd.stock[Farm.EGG] < Farm.EGGS_PER_CHICK) return "Need " + Farm.EGGS_PER_CHICK + " eggs";
-        if (herd.chickenRoom() <= 0) return "Coop is full";
-        herd.hatch();
-        saveShop();
-        return null;
-    }
-
-    String buyCow() {
-        if (herd.house[Farm.BARN] == 0) return "Build a barn first";
-        if (herd.cowRoom() <= 0) return "Barn is full";
-        if (totalCoins < Farm.COW_PRICE) return "Not enough coins";
-        totalCoins -= Farm.COW_PRICE;
-        herd.cows++;
+    /** Does the next action for a species. Returns null on success, otherwise why it could not be done. */
+    String tend(int sp) {
+        int act = nextAction(sp);
+        switch (act) {
+            case ACT_LOCKED:
+                return "Beat level " + (Farm.HOUSE_UNLOCK_LEVEL[sp] - 1) + " first";
+            case ACT_FULL:
+                return "Fully upgraded";
+            case ACT_NEED_EGGS:
+                return "Need " + (Farm.EGGS_PER_CHICK - herd.stock[Farm.EGG]) + " more eggs";
+            case ACT_HATCH:
+                herd.hatch();
+                break;
+            default: {
+                int cost = actionPrice(sp);
+                if (totalCoins < cost) return "Not enough coins";
+                totalCoins -= cost;
+                if (act == ACT_BUY) herd.count[sp]++;
+                else herd.house[sp]++;
+            }
+        }
         saveShop();
         return null;
     }

@@ -255,7 +255,7 @@ final class Renderer {
         gfx.rrect(c, p.left, p.top, p.right, p.bottom, 4 * v.u, WOOD);
         gfx.rrect(c, p.left + v.u * 0.8f, p.top + v.u * 0.8f, p.right - v.u * 0.8f, p.bottom - v.u * 0.8f, 3.4f * v.u, CREAM);
         if (v.level == null) return;
-        boolean herdAnimals = v.progress.herd.chickens + v.progress.herd.cows + v.progress.herd.chickCount() > 0;
+        boolean herdAnimals = v.progress.herd.animals() > 0;
         String title = v.farming ? "GOALS DONE - FARMING FOR THE HERD"
                 : v.level.herdGoal == Farm.EGG ? "LEVEL " + v.level.number + " - HATCH MORE CHICKS"
                 : v.level.herdGoal >= 0 && herdAnimals ? "LEVEL " + v.level.number + " - FEED THE HERD"

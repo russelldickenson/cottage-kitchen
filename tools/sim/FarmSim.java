@@ -4,8 +4,8 @@ import java.util.Arrays;
 
 /**
  * Plays whole campaigns with a simple buying policy and reports how the farm behaves: how much the animals earn,
- * how often they go hungry and how long the fed streak lasts. Run: tools/sim/run.sh [campaigns] farm
- * The bots do not steer toward what the herd needs, so hunger rates here are a floor for a real player.
+ * how often they go hungry, how long the fed streak lasts and how the herd grows. Run: tools/sim/run.sh [campaigns] farm
+ * The bots steer only through the level goals (see Level.get), so hunger rates here are for a player who does the goals.
  */
 final class FarmSim {
     static void run(int campaigns) {
@@ -14,10 +14,10 @@ final class FarmSim {
     }
 
     private static void report(int campaigns, double skill, String name) {
-        int n = Level.COUNT;
+        int n = Level.COUNT, sp = Farm.SPECIES;
         double[] play = new double[n], animals = new double[n], bonus = new double[n], hungryRate = new double[n], streak = new double[n];
-        double[] farmMoves = new double[n], chickens = new double[n], cows = new double[n], banked = new double[n];
-        double[][] hauled = new double[n][Farm.STOCKS];
+        double[] farmMoves = new double[n], banked = new double[n], spent = new double[n];
+        double[][] herd = new double[n][sp], hauled = new double[n][Farm.STOCKS];
         for (int g = 0; g < campaigns; g++) {
             Farm.Herd h = new Farm.Herd();
             int coins = 0;
@@ -42,51 +42,49 @@ final class FarmSim {
                 streak[i] += rp.streak;
                 for (int s = 0; s < Farm.STOCKS; s++) hauled[i][s] += rp.hauled[s];
                 coins += p + rp.coins;
+                int before = coins;
                 coins = spend(h, coins, i);
-                chickens[i] += h.chickens;
-                cows[i] += h.cows;
+                spent[i] += before - coins;
+                for (int s = 0; s < sp; s++) herd[i][s] += h.count[s];
                 banked[i] += coins;
             }
         }
         System.out.printf("%n%s bot, %d campaigns%n", name, campaigns);
-        System.out.println("lvl  play | animals (share, streak bonus) | hungry lvls | streak | hauled egg seed hay water | hens cows | farm moves | banked");
+        System.out.println("lvl  play | animals (share, streak bonus) | hungry | streak | farm mv | hens cows pigs sheep bees | spent | banked");
         for (int i = 0; i < n; i++) {
             double pl = play[i] / campaigns, an = animals[i] / campaigns;
-            System.out.printf("%3d %5.0f | %5.0f (%4.1f%%, %4.0f) | %9.0f%% | %6.1f | %12.0f %4.0f %4.0f %5.0f | %4.1f %4.1f | %10.1f | %6.0f%n", i + 1, pl, an, 100 * an / (pl + an), bonus[i] / campaigns,
-                    100 * hungryRate[i] / campaigns, streak[i] / campaigns, hauled[i][0] / campaigns, hauled[i][1] / campaigns, hauled[i][2] / campaigns, hauled[i][3] / campaigns,
-                    chickens[i] / campaigns, cows[i] / campaigns, farmMoves[i] / campaigns, banked[i] / campaigns);
+            System.out.printf("%3d %5.0f | %5.0f (%4.1f%%, %4.0f) | %5.0f%% | %6.1f | %7.1f | %4.1f %4.1f %4.1f %5.1f %4.1f | %5.0f | %6.0f%n", i + 1, pl, an, 100 * an / (pl + an), bonus[i] / campaigns,
+                    100 * hungryRate[i] / campaigns, streak[i] / campaigns, farmMoves[i] / campaigns,
+                    herd[i][0] / campaigns, herd[i][1] / campaigns, herd[i][2] / campaigns, herd[i][3] / campaigns, herd[i][4] / campaigns, spent[i] / campaigns, banked[i] / campaigns);
         }
     }
 
-    /** Hatch what can be hatched, then buy the coop, barn, cows and house upgrades as soon as they are affordable. */
+    /**
+     * Hatch what can be hatched, then keep doing each species' next step (build, buy, upgrade) when it is affordable.
+     * Species are tried best payer first, so a limited purse goes to the animals that earn most.
+     */
     private static int spend(Farm.Herd h, int coins, int levelIndex) {
+        int[] order = {Farm.COW, Farm.PIG, Farm.SHEEP, Farm.BEE, Farm.CHICKEN};
         boolean again = true;
         while (again) {
             again = false;
             while (h.canHatch()) h.hatch();
-            int coopCost = h.house[Farm.COOP] >= Farm.MAX_HOUSE_LEVEL ? -1 : Farm.HOUSE_COST[Farm.COOP][h.house[Farm.COOP]];
-            int barnCost = h.house[Farm.BARN] >= Farm.MAX_HOUSE_LEVEL ? -1 : Farm.HOUSE_COST[Farm.BARN][h.house[Farm.BARN]];
-            boolean barnOpen = levelIndex + 2 >= Farm.HOUSE_UNLOCK_LEVEL[Farm.BARN];
-            if (h.house[Farm.BARN] > 0 && h.cowRoom() > 0 && coins >= Farm.COW_PRICE) {
-                coins -= Farm.COW_PRICE;
-                h.cows++;
+            for (int sp : order) {
+                if (levelIndex + 2 < Farm.HOUSE_UNLOCK_LEVEL[sp]) continue;
+                int price;
+                boolean buy = false;
+                if (h.house[sp] == 0) price = Farm.houseCost(sp, 0);
+                else if (h.room(sp) > 0) {
+                    if (sp == Farm.CHICKEN) continue;
+                    price = Farm.animalPrice(sp);
+                    buy = true;
+                } else price = Farm.houseCost(sp, h.house[sp]);
+                if (price < 0 || coins < price) continue;
+                coins -= price;
+                if (buy) h.count[sp]++;
+                else h.house[sp]++;
                 again = true;
-            } else if (h.house[Farm.COOP] == 0 && coins >= coopCost) {
-                coins -= coopCost;
-                h.house[Farm.COOP]++;
-                again = true;
-            } else if (h.house[Farm.BARN] == 0 && barnOpen && coins >= barnCost) {
-                coins -= barnCost;
-                h.house[Farm.BARN]++;
-                again = true;
-            } else if (h.house[Farm.COOP] > 0 && coopCost > 0 && h.chickenRoom() <= 0 && coins >= coopCost) {
-                coins -= coopCost;
-                h.house[Farm.COOP]++;
-                again = true;
-            } else if (h.house[Farm.BARN] > 0 && barnCost > 0 && h.cowRoom() <= 0 && coins >= barnCost) {
-                coins -= barnCost;
-                h.house[Farm.BARN]++;
-                again = true;
+                break;
             }
         }
         return coins;
