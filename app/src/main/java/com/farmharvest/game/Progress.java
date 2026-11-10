@@ -33,6 +33,7 @@ final class Progress {
         for (int i = 0; i < herd.chicks.length; i++) herd.chicks[i] = prefs.getInt("chicks_" + i, 0);
         herd.chickens = prefs.getInt("chickens", 0);
         herd.cows = prefs.getInt("cows", 0);
+        herd.streak = prefs.getInt("streak", 0);
     }
 
     /** The old flat-bonus output upgrades were replaced by animals: pay back what was spent on them, once. */
@@ -55,7 +56,7 @@ final class Progress {
         for (int i = 0; i < herd.stock.length; i++) e.putInt("stock_" + i, herd.stock[i]);
         for (int i = 0; i < herd.house.length; i++) e.putInt("house_" + i, herd.house[i]);
         for (int i = 0; i < herd.chicks.length; i++) e.putInt("chicks_" + i, herd.chicks[i]);
-        e.putInt("chickens", herd.chickens).putInt("cows", herd.cows);
+        e.putInt("chickens", herd.chickens).putInt("cows", herd.cows).putInt("streak", herd.streak);
         e.apply();
     }
 

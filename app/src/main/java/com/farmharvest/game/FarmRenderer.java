@@ -135,7 +135,10 @@ final class FarmRenderer {
         gfx.textC(c, haul.toString(), b.centerX(), b.top + h - 12.5f * u, 3.6f * u, 0xFF3E7A22, 0, Paint.Align.CENTER);
         Farm.Herd hd = v.progress.herd;
         if (v.report.hungry > 0) {
-            gfx.textC(c, v.report.hungry + (v.report.hungry == 1 ? " animal went hungry" : " animals went hungry"), b.centerX(), b.top + h - 7.8f * u, 3.4f * u, RED, 0, Paint.Align.CENTER);
+            String hungry = v.report.hungry + (v.report.hungry == 1 ? " animal went hungry" : " animals went hungry") + "  (streak " + v.report.streak + ")";
+            gfx.textC(c, hungry, b.centerX(), b.top + h - 7.8f * u, 3.4f * u, RED, 0, Paint.Align.CENTER);
+        } else if (v.report.streak > 0) {
+            gfx.textC(c, "All fed! Streak " + v.report.streak + ": +" + v.report.bonusPct + "% animal coins", b.centerX(), b.top + h - 7.8f * u, 3.4f * u, 0xFF3E9E22, 0, Paint.Align.CENTER);
         } else if (hd.house[Farm.COOP] + hd.house[Farm.BARN] == 0) {
             gfx.textC(c, "Build a coop below to use your eggs!", b.centerX(), b.top + h - 7.8f * u, 3.4f * u, 0xFF8B5A2B, 0, Paint.Align.CENTER);
         }
@@ -254,10 +257,10 @@ final class FarmRenderer {
                 status = "Hatch eggs to start";
                 col = 0xFF8B5A2B;
             } else if (short_) {
-                status = "Low on feed!";
+                status = hd.streak > 0 ? "Low! Streak at risk" : "Low on feed!";
                 col = RED;
             } else {
-                status = "All fed";
+                status = hd.streak > 0 ? "Streak " + hd.streak + "  +" + Farm.streakPct(hd.streak) + "%" : "All fed";
                 col = 0xFF3E9E22;
             }
             gfx.textC(c, status, lx, cd.top + hgt * 0.78f, 3.5f * u, col, 0, Paint.Align.LEFT);

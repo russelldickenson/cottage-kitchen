@@ -15,6 +15,8 @@ public class Sim {
     static boolean powerUpsOn = true;
     static long harvestedTiles, harvestedValue;
     static long levelCoins;
+    /** Tiles harvested per tile type during the last playLevel (counting only), for the farm simulation. */
+    static final long[] byType = new long[Art.COUNT];
     static final boolean NO_SPECIALS = Boolean.getBoolean("nospecials");
 
     static final class State {
@@ -89,6 +91,7 @@ public class Sim {
             for (Tile t : counted) {
                 if (counting && t.type < Art.CROPS) {
                     harvestedTiles++;
+                    byType[t.type]++;
                     harvestedValue += Farm.BASE_PRICE[t.type];
                 }
                 if (t.type < Art.CROPS && s.need[t.type] > 0) {
@@ -194,6 +197,10 @@ public class Sim {
             for (int[] row : Farm.HOUSE_COST) for (int cost : row) houses += cost;
             for (int cost : Farm.DECOR_COST) dec += cost;
             System.out.println("Coop and barn upgrades cost " + houses + ", decorations " + dec + ", total " + (houses + dec) + " coins (animals extra).");
+            return;
+        }
+        if (args.length > 1 && args[1].equals("farm")) {
+            FarmSim.run(Integer.parseInt(args[0]));
             return;
         }
         if (args.length > 1 && args[1].equals("stats")) {
