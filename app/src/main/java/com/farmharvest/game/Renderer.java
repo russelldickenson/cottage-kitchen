@@ -117,7 +117,7 @@ final class Renderer {
         float m = 3 * v.u, hh = 13 * v.u, hudTop = v.topInset + m;
         // level + moves
         float mw = 27 * v.u;
-        drawPill(c, m + hh + m * 0.8f, hudTop, v.W - m - mw - m * 0.8f, hudTop + hh, Recipes.INGREDIENT[v.level.ingredient()] + " " + (v.level.step + 1) + "/" + v.level.recipe.ingredients.length, v.level.ingredient());
+        drawPill(c, m + hh + m * 0.8f, hudTop, v.W - m - mw - m * 0.8f, hudTop + hh, (v.level.goalCounts[0] - v.need[v.level.ingredient()]) + "/" + v.level.goalCounts[0], v.level.ingredient());
         float ml = v.W - m - mw, mr = v.W - m;
         gfx.rrect(c, ml, hudTop + hh * 0.07f, mr, hudTop + hh * 1.07f, hh / 2, Gfx.darken(PANEL, 0.6f));
         gfx.rrect(c, ml, hudTop, mr, hudTop + hh, hh / 2, PANEL);

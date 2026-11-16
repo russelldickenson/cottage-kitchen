@@ -159,11 +159,8 @@ final class CookRenderer {
             if (now) {
                 int goal = lv.goalCounts[0], got = goal - v.need[kind];
                 if (got > 0) gfx.rrect(c, bl, cy - bh / 2, bl + Math.max(bh, (br - bl) * got / goal), cy + bh / 2, bh / 2, got >= goal ? 0xFF4CBB2C : 0xFFFFB02E);
-                if (got >= goal) {
-                    gfx.check(c, rowsRight - 4.5f * v.u, cy, rowH * 0.32f);
-                } else {
-                    gfx.textC(c, got + "/" + goal, rowsRight, cy, rowH * 0.46f, Color.WHITE, 0xFF8B5A2B, Paint.Align.RIGHT);
-                }
+                // the count lives in the pill at the top; the card only shows the bar and a tick when it is full
+                if (got >= goal) gfx.check(c, rowsRight - 4.5f * v.u, cy, rowH * 0.32f);
             } else if (done) {
                 gfx.rrect(c, bl, cy - bh / 2, br, cy + bh / 2, bh / 2, 0xFF4CBB2C);
                 gfx.check(c, rowsRight - 4.5f * v.u, cy, rowH * 0.32f);
