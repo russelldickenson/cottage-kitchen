@@ -178,11 +178,11 @@ public class Sim {
             StringBuilder sm = new StringBuilder();
             for (int i = 0; i < Level.COUNT; i++) {
                 // the budget is the expert's average, with slack that shrinks over the game
-                double slack = 1.5 - 0.12 * (i % Level.STAGES) - 0.2 * (i / Level.STAGES) / (Recipes.ALL.length - 1);
+                double slack = 1.5 - 0.4 * i / (Level.COUNT - 1);
                 int scale = Level.scaleFor(i);
                 double target = expertMoves(i, scale, games);
                 int moves = Math.max(9, (int) Math.ceil(target * slack));
-                System.out.printf("level %2d  %-18s batch %d  scale %3d  expert needs %.1f  budget %d (x%.2f)%n", i + 1, Level.get(i).recipe.name, Level.get(i).stage + 1, scale, target, moves, slack);
+                System.out.printf("level %2d  %-18s %-12s collect %3d  expert needs %.1f  budget %d (x%.2f)%n", i + 1, Level.get(i).recipe.name, Recipes.INGREDIENT[Level.get(i).ingredient()], scale, target, moves, slack);
                 sm.append(moves).append(i + 1 < Level.COUNT ? ", " : "");
             }
             System.out.println("MOVES = {" + sm + "}");

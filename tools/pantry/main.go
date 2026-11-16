@@ -101,21 +101,24 @@ func (c *canvas) body(s shape, edge float64, col color.NRGBA) {
 	c.fill(s, col)
 }
 
-func (c *canvas) face(cx, cy, gap float64) {
+func (c *canvas) face(cx, cy, gap float64) { c.faceK(cx, cy, gap, 1) }
+
+// faceK draws the face scaled by k.
+func (c *canvas) faceK(cx, cy, gap, k float64) {
 	white, dark := color.NRGBA{255, 255, 255, 255}, color.NRGBA{0x2A, 0x1A, 0x10, 255}
 	for _, dx := range []float64{-gap, gap} {
-		c.fill(ellipse(cx+dx, cy, 11, 12), dark)
-		c.fill(ellipse(cx+dx, cy, 9, 10), white)
-		c.fill(ellipse(cx+dx+1, cy+1, 5, 5.5), dark)
-		c.fill(ellipse(cx+dx+2.5, cy-1, 1.8, 1.8), white)
+		c.fill(ellipse(cx+dx, cy, 11*k, 12*k), dark)
+		c.fill(ellipse(cx+dx, cy, 9*k, 10*k), white)
+		c.fill(ellipse(cx+dx+1*k, cy+1*k, 5*k, 5.5*k), dark)
+		c.fill(ellipse(cx+dx+2.5*k, cy-1*k, 1.8*k, 1.8*k), white)
 	}
 	// smile
 	var prev [2]float64
 	for i := 0; i <= 12; i++ {
 		a := math.Pi * (0.15 + 0.7*float64(i)/12)
-		x, y := cx+math.Cos(a)*14, cy+16+math.Sin(a)*9
+		x, y := cx+math.Cos(a)*14*k, cy+(16+math.Sin(a)*9)*k
 		if i > 0 {
-			c.fill(capsule(prev[0], prev[1], x, y, 3.4), dark)
+			c.fill(capsule(prev[0], prev[1], x, y, 3.4*k), dark)
 		}
 		prev = [2]float64{x, y}
 	}
@@ -194,6 +197,23 @@ func flour() *canvas {
 	return c
 }
 
+func sugar() *canvas {
+	c := newCanvas()
+	front, top, side := color.NRGBA{0xF7, 0xF9, 0xFD, 255}, color.NRGBA{0xFF, 0xFF, 0xFF, 255}, color.NRGBA{0xD3, 0xDA, 0xE8, 255}
+	spark := color.NRGBA{0x8D, 0xCE, 0xFA, 255}
+	c.fill(ellipse(96, 176, 56, 7), color.NRGBA{0, 0, 0, 40})
+	c.body(poly(50, 88, 76, 60, 158, 60, 132, 88), 4, top)
+	c.body(poly(132, 88, 158, 60, 158, 144, 132, 172), 4, side)
+	c.body(rrect(50, 88, 132, 172, 8), 4, front)
+	c.fill(poly(132, 88, 158, 60, 158, 144, 132, 172), side)
+	c.fill(poly(54, 90, 78, 64, 154, 64, 130, 90), top)
+	for _, p := range [][2]float64{{70, 72}, {118, 70}, {140, 112}, {64, 102}} {
+		c.fill(poly(p[0], p[1]-6, p[0]+2, p[1]-2, p[0]+6, p[1], p[0]+2, p[1]+2, p[0], p[1]+6, p[0]-2, p[1]+2, p[0]-6, p[1], p[0]-2, p[1]-2), spark)
+	}
+	c.faceK(91, 128, 17, 0.8)
+	return c
+}
+
 func main() {
 	dir := "."
 	if len(os.Args) > 1 {
@@ -201,4 +221,5 @@ func main() {
 	}
 	milk().save(filepath.Join(dir, "crop_milk.png"))
 	flour().save(filepath.Join(dir, "crop_flour.png"))
+	sugar().save(filepath.Join(dir, "crop_sugar.png"))
 }

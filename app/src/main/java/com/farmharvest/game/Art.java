@@ -16,13 +16,15 @@ final class Art {
             R.drawable.crop_sunflower,
             R.drawable.crop_bee,
             R.drawable.crop_milk,
+            R.drawable.crop_sugar,
+            R.drawable.crop_water,
             R.drawable.crop_scarecrow,
             R.drawable.crop_tnt,
             R.drawable.crop_egg_gold,
             R.drawable.crop_tractor,
     };
-    static final int CROPS = 13;
-    static final int SCARECROW = 13, TNT = 14, GOLDEN_EGG = 15, TRACTOR = 16;
+    static final int CROPS = 15;
+    static final int SCARECROW = 15, TNT = 16, GOLDEN_EGG = 17, TRACTOR = 18;
     static final int COUNT = RES.length;
 
     static boolean isSpecial(int type) {

@@ -96,6 +96,12 @@ final class Renderer {
         c.drawPath(hill2, plain);
     }
 
+    void drawIcon(Canvas c, int type, float cx, float cy, float size, float alpha) {
+        bmp.setAlpha((int) (255 * alpha));
+        drawIcon(c, type, cx, cy, size);
+        bmp.setAlpha(255);
+    }
+
     void drawIcon(Canvas c, int type, float cx, float cy, float size) {
         Bitmap b = art[type];
         src.set(0, 0, b.getWidth(), b.getHeight());
@@ -133,7 +139,7 @@ final class Renderer {
         float m = 3 * v.u, hh = 13 * v.u, hudTop = v.topInset + m;
         // level + moves
         float mw = 27 * v.u;
-        drawPill(c, m + hh + m * 0.8f, hudTop, v.W - m - mw - m * 0.8f, hudTop + hh, "Batch " + (v.level.stage + 1) + " of " + Level.STAGES);
+        drawPill(c, m + hh + m * 0.8f, hudTop, v.W - m - mw - m * 0.8f, hudTop + hh, Recipes.INGREDIENT[v.level.ingredient()] + " " + (v.level.step + 1) + "/" + v.level.recipe.ingredients.length);
         float ml = v.W - m - mw, mr = v.W - m;
         gfx.rrect(c, ml, hudTop + hh * 0.07f, mr, hudTop + hh * 1.07f, hh / 2, Gfx.darken(PANEL, 0.6f));
         gfx.rrect(c, ml, hudTop, mr, hudTop + hh, hh / 2, PANEL);

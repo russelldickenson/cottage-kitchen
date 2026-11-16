@@ -162,7 +162,7 @@ public class GameView extends View {
                 float x = m + (i % 3) * (cw + gap), y = areaTop + (i / 3) * (ch + gap);
                 bookCard[i].set(x, y, x + cw, y + ch);
                 if (progress.recipeUnlocked(i)) {
-                    Button b = addHit(bookCard[i], () -> startLevel(dish * Level.STAGES + progress.nextBatch(dish)));
+                    Button b = addHit(bookCard[i], () -> startLevel(Recipes.firstLevel(dish) + progress.nextStep(dish)));
                     b.card = dish;
                 }
             }
@@ -572,13 +572,13 @@ public class GameView extends View {
     private void endLevel(boolean win) {
         won = win;
         stars = win ? Rules.stars(movesLeft, level.moves) : 0;
-        firstCook = win && level.lastStage() && progress.bestStars[levelIndex] == 0;
+        firstCook = win && level.lastStep() && progress.bestStars[levelIndex] == 0;
         progress.levelFinished(levelIndex, stars);
         if (win) {
             sfx.win();
             phase = Phase.DONE;
             doneT = 0;
-            addPop(level.lastStage() ? level.recipe.name + " is ready!" : "Batch " + (level.stage + 1) + " done!", W / 2, by + cell * 3f, cell * 0.8f, 1.4f, 0xFFFFD43B);
+            addPop(level.lastStep() ? level.recipe.name + " is ready!" : Recipes.INGREDIENT[level.ingredient()] + " collected!", W / 2, by + cell * 3f, cell * 0.8f, 1.4f, 0xFFFFD43B);
             buildButtons();
         } else {
             sfx.lose();

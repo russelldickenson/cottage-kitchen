@@ -19,19 +19,31 @@ final class Progress {
         for (int i = 0; i < Level.COUNT; i++) bestStars[i] = prefs.getInt("stars_" + i, 0);
     }
 
-    /** A dish is open once the one before it has been cooked (all its batches). */
-    boolean recipeUnlocked(int recipe) {
-        return unlocked > recipe * Level.STAGES;
+    /** A dish is open once the one before it has been cooked (all its ingredients collected). */
+    boolean recipeUnlocked(int dish) {
+        return unlocked > Recipes.firstLevel(dish);
     }
 
-    boolean recipeDone(int recipe) {
-        return bestStars[recipe * Level.STAGES + Level.STAGES - 1] > 0;
+    boolean recipeDone(int dish) {
+        return bestStars[Recipes.lastLevel(dish)] > 0;
     }
 
-    /** The batch to cook next: the first one not yet cleared, or the last again once the order is done. */
-    int nextBatch(int recipe) {
-        for (int s = 0; s < Level.STAGES; s++) if (bestStars[recipe * Level.STAGES + s] == 0) return s;
-        return Level.STAGES - 1;
+    boolean ingredientDone(int dish, int step) {
+        return bestStars[Recipes.firstLevel(dish) + step] > 0;
+    }
+
+    /** How many of a dish's ingredients have been collected. */
+    int ingredientsDone(int dish) {
+        int n = 0;
+        for (int s = 0; s < Recipes.ALL[dish].ingredients.length; s++) if (ingredientDone(dish, s)) n++;
+        return n;
+    }
+
+    /** The ingredient to collect next: the first one not yet done, or the last again once the dish is finished. */
+    int nextStep(int dish) {
+        int n = Recipes.ALL[dish].ingredients.length;
+        for (int s = 0; s < n; s++) if (!ingredientDone(dish, s)) return s;
+        return n - 1;
     }
 
     /** Records a finished level. stars is 0 for a loss. */

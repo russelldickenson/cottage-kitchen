@@ -1,36 +1,38 @@
 package com.farmharvest.game;
 
 /**
- * Level definition: the dish to cook, which ingredients are on the board, how many of each it needs, and the move budget.
- * Each dish is an order of STAGES batches: every batch is a bigger order on a busier board, so one picture serves several levels.
+ * Level definition: one ingredient of one dish to collect, which tiles are on the board, and the move budget.
+ * A dish is finished once all of its ingredient levels have been cleared.
  */
 final class Level {
-    static final int STAGES = 3;
-    static final int COUNT = Recipes.ALL.length * STAGES;
+    static final int COUNT = Recipes.LEVELS;
 
     /** Power-up tiles (Golden Egg, Tractor, TNT, Scarecrow) only appear from this level number. */
-    static final int POWER_UP_LEVEL = 10;
+    static final int POWER_UP_LEVEL = 12;
 
-    /** Move budgets, produced by tools/sim/run.sh (tune) from how fast an expert bot clears each order. */
+    /** Move budgets, produced by tools/sim/run.sh (tune) from how fast an expert bot collects each order. */
     private static final int[] MOVES = {
-            11, 14, 16, 10, 14, 16, 13, 15, 16, 12, 13, 15, 11, 13, 14,
-            14, 15, 17, 15, 16, 18, 15, 16, 18, 15, 17, 19, 14, 15, 16,
-            18, 19, 19, 14, 16, 16, 18, 20, 22, 19, 19, 20};
+            11, 11, 11, 12, 12, 11, 12, 12, 12, 12, 12, 11, 11, 12, 12,
+            13, 12, 12, 12, 13, 13, 13, 14, 13, 14, 14, 14, 15, 15, 15,
+            15, 16, 15, 17, 15, 17, 16, 18, 17, 17, 18, 17, 19, 17, 18,
+            18, 18, 18, 19};
 
-    final int number, stage;
+    /** Position in the book, then the ingredient within the dish. */
+    final int number, dish, step;
     final Recipes.Recipe recipe;
     final int[] kinds;
     final int[] goalKinds;
     final int[] goalCounts;
     final int moves;
 
-    Level(int number, int stage, Recipes.Recipe recipe, int[] kinds, int[] goalKinds, int[] goalCounts, int moves) {
+    Level(int number, int dish, int step, int[] kinds, int goalKind, int goalCount, int moves) {
         this.number = number;
-        this.stage = stage;
-        this.recipe = recipe;
+        this.dish = dish;
+        this.step = step;
+        this.recipe = Recipes.ALL[dish];
         this.kinds = kinds;
-        this.goalKinds = goalKinds;
-        this.goalCounts = goalCounts;
+        this.goalKinds = new int[]{goalKind};
+        this.goalCounts = new int[]{goalCount};
         this.moves = moves;
     }
 
@@ -38,47 +40,41 @@ final class Level {
         return number >= POWER_UP_LEVEL;
     }
 
-    boolean lastStage() {
-        return stage == STAGES - 1;
+    int ingredient() {
+        return goalKinds[0];
+    }
+
+    boolean lastStep() {
+        return step == recipe.ingredients.length - 1;
     }
 
     int totalNeeded() {
-        int t = 0;
-        for (int c : goalCounts) t += c;
-        return t;
+        return goalCounts[0];
     }
 
-    /** Base size of the order: it grows with the dish and with every batch of it. */
+    /** How many of the ingredient to collect: it grows steadily through the book. */
     static int scaleFor(int index) {
-        return Math.round(10 + 1.3f * (index / STAGES) + 4.5f * (index % STAGES));
+        return Math.round(10 + 0.45f * index);
     }
 
     static Level get(int index) {
         return get(index, MOVES[index], scaleFor(index));
     }
 
-    /**
-     * Ingredients the dish needs, plus other tiles to fill the board: five kinds, or one per ingredient if there are
-     * more. Later batches ask for more of each ingredient. A dish with more ingredients is a bigger order.
-     */
-    static Level get(int index, int moves, int scale) {
-        Recipes.Recipe rc = Recipes.ALL[index / STAGES];
-        int stage = index % STAGES;
-        int n = rc.ingredients.length, partSum = 0;
-        for (int p : rc.parts) partSum += p;
-        int total = Math.round(scale * (1f + 0.5f * (n - 1)));
-        int[] counts = new int[n];
-        for (int i = 0; i < n; i++) counts[i] = Math.max(3, Math.round(total * rc.parts[i] / (float) partSum));
-
-        int[] kinds = new int[Math.min(Art.CROPS, Math.max(5, n))];
+    /** The ingredient on a board of five kinds: the dish's own ingredients first, then others to fill it up. */
+    static Level get(int index, int moves, int count) {
+        int dish = Recipes.dishOf(index), step = index - Recipes.firstLevel(dish);
+        Recipes.Recipe rc = Recipes.ALL[dish];
+        int n = rc.ingredients.length;
+        int[] kinds = new int[Math.max(5, n)];
         System.arraycopy(rc.ingredients, 0, kinds, 0, n);
-        int k = n;
-        for (int step = 0; k < kinds.length; step++) {
-            int filler = (3 * index + 5 * step + 2) % Art.CROPS;
+        int k = n, filler = (7 * index + 3) % Art.CROPS;
+        while (k < kinds.length) {
             boolean used = false;
             for (int i = 0; i < k; i++) used |= kinds[i] == filler;
             if (!used) kinds[k++] = filler;
+            filler = (filler + 1) % Art.CROPS;
         }
-        return new Level(index + 1, stage, rc, kinds, rc.ingredients.clone(), counts, moves);
+        return new Level(index + 1, dish, step, kinds, rc.ingredients[step], count, moves);
     }
 }
