@@ -13,12 +13,9 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.LinearGradient;
 import android.graphics.Paint;
-import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.RectF;
-import android.graphics.Shader;
 
 import com.farmharvest.game.GameView.Button;
 import com.farmharvest.game.GameView.Phase;
@@ -34,9 +31,7 @@ final class Renderer {
     private final Effects fx;
     private final Bitmap[] art = new Bitmap[Art.COUNT];
     private final Paint bmp = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
-    private final Paint sky = new Paint();
-    private final Paint plain = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Path hill1 = new Path(), hill2 = new Path();
+    private Bitmap backdrop;
     final CookRenderer cook;
     private final Rect src = new Rect();
     private final RectF dst = new RectF();
@@ -51,23 +46,10 @@ final class Renderer {
         for (int i = 0; i < Art.COUNT; i++) art[i] = BitmapFactory.decodeResource(ctx.getResources(), Art.RES[i], o);
     }
 
-    /** Rebuilds the size-dependent background shapes. */
+    /** Redraws the kitchen backdrop for the new screen size. */
     void onSize(float W, float H) {
-        sky.setShader(new LinearGradient(0, 0, 0, H, 0xFF6EC8F5, 0xFFE4F6FF, Shader.TileMode.CLAMP));
-        hill1.reset();
-        hill1.moveTo(0, H * 0.80f);
-        hill1.quadTo(W * 0.25f, H * 0.68f, W * 0.55f, H * 0.78f);
-        hill1.quadTo(W * 0.82f, H * 0.87f, W, H * 0.74f);
-        hill1.lineTo(W, H);
-        hill1.lineTo(0, H);
-        hill1.close();
-        hill2.reset();
-        hill2.moveTo(0, H * 0.90f);
-        hill2.quadTo(W * 0.3f, H * 0.80f, W * 0.65f, H * 0.90f);
-        hill2.quadTo(W * 0.85f, H * 0.96f, W, H * 0.87f);
-        hill2.lineTo(W, H);
-        hill2.lineTo(0, H);
-        hill2.close();
+        if (backdrop != null) backdrop.recycle();
+        backdrop = new Backdrop(gfx).build((int) W, (int) H);
     }
 
     void draw(Canvas c) {
@@ -79,21 +61,7 @@ final class Renderer {
     }
 
     private void drawBackground(Canvas c) {
-        c.drawRect(0, 0, v.W, v.H, sky);
-        gfx.circle(c, v.W * 0.85f, v.H * 0.12f + v.topInset * 0.3f, 11 * v.u, 0x55FFF3A0);
-        gfx.circle(c, v.W * 0.85f, v.H * 0.12f + v.topInset * 0.3f, 7 * v.u, 0xFFFFE066);
-        for (int i = 0; i < 3; i++) {
-            float x = ((v.time * (3 + i * 1.5f) * v.u + i * v.W * 0.45f) % (v.W * 1.5f)) - v.W * 0.25f;
-            float y = v.H * (0.13f + i * 0.09f);
-            float s = v.u * (5 + i);
-            gfx.ellipse(c, x, y, s * 2.6f, s * 1.1f, 0xCCFFFFFF);
-            gfx.circle(c, x - s * 0.8f, y - s * 0.6f, s * 1.2f, 0xCCFFFFFF);
-            gfx.circle(c, x + s * 0.7f, y - s * 0.8f, s * 1.5f, 0xCCFFFFFF);
-        }
-        plain.setColor(0xFF8BD450);
-        c.drawPath(hill1, plain);
-        plain.setColor(0xFF68B83A);
-        c.drawPath(hill2, plain);
+        if (backdrop != null) c.drawBitmap(backdrop, 0, 0, null);
     }
 
     void drawIcon(Canvas c, int type, float cx, float cy, float size, float alpha) {
