@@ -21,6 +21,9 @@ const (
 	tileSize = 192
 )
 
+// holes lists pictures with background showing through enclosed gaps (a bow, a handle), which are cleared too.
+var holes = map[string]bool{"strawberry_jam": true}
+
 // tight lists pictures whose dish has light grey parts (a plate) that a normal tolerance would eat.
 var tight = map[string]float64{"pumpkin_soup": 4.5}
 
@@ -39,7 +42,7 @@ func main() {
 	}
 	dst := filepath.Join(root, "../../app/src/main/res/drawable-nodpi")
 	var files []string
-	for _, pat := range []string{"dish_*.jpeg", "crop_*.jpeg", "crop_*.png"} {
+	for _, pat := range []string{"dish_*.jpeg", "dish_*.png", "crop_*.jpeg", "crop_*.png"} {
 		m, _ := filepath.Glob(filepath.Join(root, "src", pat))
 		files = append(files, m...)
 	}
@@ -54,7 +57,7 @@ func main() {
 		if t, ok := tight[key]; ok {
 			tol = t
 		}
-		keyOut(im, tol)
+		keyOut(im, tol, holes[key])
 		im = largest(im)
 		var res *image.NRGBA
 		if strings.HasPrefix(name, "crop_") {
@@ -117,7 +120,7 @@ func near(c, bg color.NRGBA, tol float64) bool {
 
 // keyOut makes the background transparent: a flood fill from the border through background-like pixels, then two
 // passes that trim the light fringe left around the outline.
-func keyOut(im *image.NRGBA, tol float64) {
+func keyOut(im *image.NRGBA, tol float64, holes bool) {
 	w, h := im.Bounds().Dx(), im.Bounds().Dy()
 	bg := im.NRGBAAt(3, 3)
 	isBg := make([]bool, w*h)
@@ -161,6 +164,17 @@ func keyOut(im *image.NRGBA, tol float64) {
 	for i, b := range isBg {
 		if b {
 			im.Pix[i*4+3] = 0
+		}
+	}
+	if holes {
+		for y := 0; y < h; y++ {
+			for x := 0; x < w; x++ {
+				c := im.NRGBAAt(x, y)
+				dr, dg, db := float64(c.R)-float64(bg.R), float64(c.G)-float64(bg.G), float64(c.B)-float64(bg.B)
+				if dr*dr+dg*dg+db*db < 14*14 {
+					im.Pix[(y*w+x)*4+3] = 0
+				}
+			}
 		}
 	}
 }
