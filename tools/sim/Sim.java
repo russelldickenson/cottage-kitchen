@@ -175,19 +175,16 @@ public class Sim {
         }
         if (args.length > 1 && args[1].equals("tune")) {
             int games = Integer.parseInt(args[0]);
-            StringBuilder sm = new StringBuilder(), ss = new StringBuilder();
-            int prevMoves = 0;
+            StringBuilder sm = new StringBuilder();
             for (int i = 0; i < Level.COUNT; i++) {
-                double slack = 1.5 - 0.35 * i / (Level.COUNT - 1);
-                int lo = (int) Math.round(10 + 1.3 * i);
-                double target = expertMoves(i, lo, games);
-                int moves = Math.max(prevMoves, (int) Math.ceil(target * slack));
-                prevMoves = moves;
-                System.out.printf("level %2d  scale %3d  expert needs %.1f  budget %d (x%.2f)%n", i + 1, lo, expertMoves(i, lo, games), moves, slack);
-                ss.append(lo).append(i + 1 < Level.COUNT ? ", " : "");
+                // the budget is the expert's average, with slack that shrinks over the game
+                double slack = 1.5 - 0.12 * (i % Level.STAGES) - 0.2 * (i / Level.STAGES) / (Recipes.ALL.length - 1);
+                int scale = Level.scaleFor(i);
+                double target = expertMoves(i, scale, games);
+                int moves = Math.max(9, (int) Math.ceil(target * slack));
+                System.out.printf("level %2d  %-18s batch %d  scale %3d  expert needs %.1f  budget %d (x%.2f)%n", i + 1, Level.get(i).recipe.name, Level.get(i).stage + 1, scale, target, moves, slack);
                 sm.append(moves).append(i + 1 < Level.COUNT ? ", " : "");
             }
-            System.out.println("SCALE = {" + ss + "}");
             System.out.println("MOVES = {" + sm + "}");
             return;
         }

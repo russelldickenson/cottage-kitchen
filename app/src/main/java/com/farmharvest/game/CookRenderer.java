@@ -178,10 +178,10 @@ final class CookRenderer {
     void drawBook(Canvas c) {
         float m = 3 * v.u;
         gfx.textC(c, "Recipe Book", v.W / 2, v.topInset + m + 6.5f * v.u, 7.5f * v.u, Color.WHITE, 0xFF1F5F10, Paint.Align.CENTER);
-        for (int i = 0; i < Level.COUNT; i++) {
+        for (int i = 0; i < Recipes.ALL.length; i++) {
             RectF k = v.bookCard[i];
-            boolean locked = i >= v.progress.unlocked, current = i == v.progress.unlocked - 1;
-            boolean cooked = v.progress.bestStars[i] > 0;
+            boolean locked = !v.progress.recipeUnlocked(i), current = (v.progress.unlocked - 1) / Level.STAGES == i;
+            boolean cooked = v.progress.recipeDone(i);
             float pressed = v.bookPressed == i ? 0.6f * v.u : 0;
             gfx.rrect(c, k.left, k.top + 0.8f * v.u, k.right, k.bottom + 0.8f * v.u, 3 * v.u, Gfx.darken(WOOD, 0.6f));
             gfx.rrect(c, k.left, k.top + pressed, k.right, k.bottom + pressed, 3 * v.u, current ? 0xFFFF9B26 : WOOD);
@@ -196,7 +196,7 @@ final class CookRenderer {
                 String name = rc.name;
                 gfx.textC(c, name, cx, k.top + pressed + h * 0.70f, fitSize(name, w * 0.15f, w * 0.9f), 0xFF6B3F17, 0, Paint.Align.CENTER);
                 for (int s = 0; s < 3; s++) {
-                    boolean on = s < v.progress.bestStars[i];
+                    boolean on = v.progress.bestStars[i * Level.STAGES + s] > 0;
                     gfx.star(c, cx + (s - 1) * w * 0.24f, k.top + pressed + h * 0.88f - (s == 1 ? 0 : w * 0.02f), w * 0.1f,
                             on ? 0xFFFFD43B : 0xFFCDBFA0, on ? 0xFFC97700 : 0xFFA89878);
                 }
@@ -215,7 +215,7 @@ final class CookRenderer {
         gfx.rrect(c, o.left, o.top, o.right, o.bottom, 6 * v.u, WOOD);
         gfx.rrect(c, o.left + v.u, o.top + v.u, o.right - v.u, o.bottom - v.u, 5 * v.u, CREAM);
         gfx.rrect(c, o.left - v.u, o.top - 3 * v.u, o.right + v.u, o.top + ph * 0.12f, 5 * v.u, v.won ? 0xFF5BC236 : 0xFFFF7A66);
-        gfx.textC(c, v.won ? "Order up!" : "Out of moves", o.centerX(), o.top + ph * 0.04f, 7.5f * v.u, Color.WHITE, v.won ? 0xFF1F5F10 : 0xFF8A2A1A, Paint.Align.CENTER);
+        gfx.textC(c, v.won ? (lv.lastStage() ? "Order up!" : "Batch " + (lv.stage + 1) + " done!") : "Out of moves", o.centerX(), o.top + ph * 0.04f, 7.5f * v.u, Color.WHITE, v.won ? 0xFF1F5F10 : 0xFF8A2A1A, Paint.Align.CENTER);
 
         float dy = o.top + ph * 0.30f, ds = Math.min(pw * 0.5f, ph * 0.28f);
         float bounce = v.won ? Math.abs((float) Math.sin(v.time * 4)) * 1.5f * v.u : 0;
@@ -234,7 +234,7 @@ final class CookRenderer {
                 gfx.star(c, o.centerX() + (s - 1) * pw * 0.22f, o.top + ph * 0.60f - (s == 1 ? 0 : pw * 0.02f), pw * 0.09f,
                         on ? 0xFFFFD43B : 0xFFCDBFA0, on ? 0xFFC97700 : 0xFFA89878);
             }
-            gfx.textC(c, v.firstCook ? "New recipe in your book!" : v.stars == 3 ? "Perfect!" : "Fewer moves earns more stars",
+            gfx.textC(c, v.firstCook ? "New recipe in your book!" : !lv.lastStage() ? "Next up: batch " + (lv.stage + 2) + " of " + Level.STAGES : v.stars == 3 ? "Perfect!" : "Fewer moves earns more stars",
                     o.centerX(), o.top + ph * 0.70f, 4.6f * v.u, v.firstCook ? 0xFFD06A00 : 0xFF8B5A2B, 0, Paint.Align.CENTER);
         } else {
             gfx.textC(c, "Still missing", o.centerX(), o.top + ph * 0.60f, 4.6f * v.u, 0xFF8B5A2B, 0, Paint.Align.CENTER);

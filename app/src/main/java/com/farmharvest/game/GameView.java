@@ -61,7 +61,7 @@ public class GameView extends View {
     final RectF kitchen = new RectF();
     final RectF boardPanel = new RectF(), tipBox = new RectF(), confirmBox = new RectF(), resultBox = new RectF();
     /** One card per dish on the recipe book screen, which is also the level menu. */
-    final RectF[] bookCard = new RectF[Level.COUNT];
+    final RectF[] bookCard = new RectF[Recipes.ALL.length];
     int bookPressed = -1;
 
     // play state
@@ -155,15 +155,15 @@ public class GameView extends View {
             addSpeaker(W - m - hh, topInset + m, hh);
             float areaTop = topInset + m + hh + 4 * u, gap = 2.5f * u;
             float areaH = H - botInset - m - areaTop;
-            int rows = (Level.COUNT + 2) / 3;
+            int rows = (Recipes.ALL.length + 2) / 3;
             float cw = (W - 2 * m - 2 * gap) / 3f, ch = Math.min(areaH / 5f, (areaH - (rows - 1) * gap) / rows);
-            for (int i = 0; i < Level.COUNT; i++) {
-                final int idx = i;
+            for (int i = 0; i < Recipes.ALL.length; i++) {
+                final int dish = i;
                 float x = m + (i % 3) * (cw + gap), y = areaTop + (i / 3) * (ch + gap);
                 bookCard[i].set(x, y, x + cw, y + ch);
-                if (i < progress.unlocked) {
-                    Button b = addHit(bookCard[i], () -> startLevel(idx));
-                    b.card = idx;
+                if (progress.recipeUnlocked(i)) {
+                    Button b = addHit(bookCard[i], () -> startLevel(dish * Level.STAGES + progress.nextBatch(dish)));
+                    b.card = dish;
                 }
             }
         } else if (phase == Phase.TIP) {
@@ -572,13 +572,13 @@ public class GameView extends View {
     private void endLevel(boolean win) {
         won = win;
         stars = win ? Rules.stars(movesLeft, level.moves) : 0;
-        firstCook = win && progress.bestStars[levelIndex] == 0;
+        firstCook = win && level.lastStage() && progress.bestStars[levelIndex] == 0;
         progress.levelFinished(levelIndex, stars);
         if (win) {
             sfx.win();
             phase = Phase.DONE;
             doneT = 0;
-            addPop(level.recipe.name + " is ready!", W / 2, by + cell * 3f, cell * 0.8f, 1.4f, 0xFFFFD43B);
+            addPop(level.lastStage() ? level.recipe.name + " is ready!" : "Batch " + (level.stage + 1) + " done!", W / 2, by + cell * 3f, cell * 0.8f, 1.4f, 0xFFFFD43B);
             buildButtons();
         } else {
             sfx.lose();

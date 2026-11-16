@@ -19,6 +19,21 @@ final class Progress {
         for (int i = 0; i < Level.COUNT; i++) bestStars[i] = prefs.getInt("stars_" + i, 0);
     }
 
+    /** A dish is open once the one before it has been cooked (all its batches). */
+    boolean recipeUnlocked(int recipe) {
+        return unlocked > recipe * Level.STAGES;
+    }
+
+    boolean recipeDone(int recipe) {
+        return bestStars[recipe * Level.STAGES + Level.STAGES - 1] > 0;
+    }
+
+    /** The batch to cook next: the first one not yet cleared, or the last again once the order is done. */
+    int nextBatch(int recipe) {
+        for (int s = 0; s < Level.STAGES; s++) if (bestStars[recipe * Level.STAGES + s] == 0) return s;
+        return Level.STAGES - 1;
+    }
+
     /** Records a finished level. stars is 0 for a loss. */
     void levelFinished(int levelIndex, int stars) {
         if (stars == 0) return;

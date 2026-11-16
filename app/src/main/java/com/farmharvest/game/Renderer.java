@@ -133,7 +133,7 @@ final class Renderer {
         float m = 3 * v.u, hh = 13 * v.u, hudTop = v.topInset + m;
         // level + moves
         float mw = 27 * v.u;
-        drawPill(c, m + hh + m * 0.8f, hudTop, v.W - m - mw - m * 0.8f, hudTop + hh, "Level " + v.level.number);
+        drawPill(c, m + hh + m * 0.8f, hudTop, v.W - m - mw - m * 0.8f, hudTop + hh, "Batch " + (v.level.stage + 1) + " of " + Level.STAGES);
         float ml = v.W - m - mw, mr = v.W - m;
         gfx.rrect(c, ml, hudTop + hh * 0.07f, mr, hudTop + hh * 1.07f, hh / 2, Gfx.darken(PANEL, 0.6f));
         gfx.rrect(c, ml, hudTop, mr, hudTop + hh, hh / 2, PANEL);
