@@ -74,6 +74,8 @@ public class GameView extends View {
     int movesLeft, combo, stars;
     boolean won, firstCook;
     float idleTime, clearTimer, time;
+    /** Seconds since the level began: the "collect this" banner shows at the start. */
+    float introT;
     Tile selected, swapA, swapB, downTile;
     int[] hint;
     Button downButton;
@@ -306,6 +308,7 @@ public class GameView extends View {
         for (int i = 0; i < level.goalKinds.length; i++) need[level.goalKinds[i]] = level.goalCounts[i];
         movesLeft = level.moves;
         combo = 0;
+        introT = 0;
         selected = null;
         hint = null;
         fx.clear();
@@ -333,6 +336,7 @@ public class GameView extends View {
             else if (b.pressed && b.card >= 0) bookPressed = b.card;
         }
         if (screen != Screen.PLAY || confirmQuit) return;
+        introT += dt;
 
         for (int r = 0; r < ROWS; r++) {
             for (int c = 0; c < COLS; c++) {

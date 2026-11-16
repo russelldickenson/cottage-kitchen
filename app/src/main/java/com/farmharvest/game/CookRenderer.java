@@ -147,6 +147,11 @@ final class CookRenderer {
             int kind = lv.recipe.ingredients[j];
             boolean now = j == lv.step, done = !now && v.progress.ingredientDone(lv.dish, j);
             float cy = rowsTop + rowH * (j + 0.5f);
+            if (now) {
+                // the ingredient this level is about stands out from the rest
+                gfx.rrect(c, rowsLeft - 1.2f * v.u, cy - rowH * 0.56f, rowsRight + 1.2f * v.u, cy + rowH * 0.56f, rowH * 0.3f, 0x33FF9B26);
+                gfx.rrectLine(c, rowsLeft - 1.2f * v.u, cy - rowH * 0.56f, rowsRight + 1.2f * v.u, cy + rowH * 0.56f, rowH * 0.3f, v.u * 0.5f, 0xFFFF9B26);
+            }
             float isz = rowH * 0.9f * (now ? 1f + 0.25f * bump[kind] : 1f);
             r.drawIcon(c, kind, rowsLeft + rowH * 0.5f, cy, isz, now || done ? 1f : 0.4f);
             float bl = rowsLeft + rowH * 1.15f, br = rowsRight - 11 * v.u, bh = rowH * 0.34f;

@@ -111,12 +111,22 @@ final class Renderer {
 
     /** A wooden pill with a short label in it. */
     void drawPill(Canvas c, float l, float t, float r, float b, String text) {
+        drawPill(c, l, t, r, b, text, -1);
+    }
+
+    /** A wooden pill with a short label and, when icon is a tile type, its picture at the left. */
+    void drawPill(Canvas c, float l, float t, float r, float b, String text, int icon) {
         float h = b - t;
         gfx.rrect(c, l, t + h * 0.07f, r, b + h * 0.07f, h / 2, Gfx.darken(PANEL, 0.6f));
         gfx.rrect(c, l, t, r, b, h / 2, PANEL);
         gfx.rrectLine(c, l + h * 0.03f, t + h * 0.03f, r - h * 0.03f, b - h * 0.03f, h / 2, h * 0.06f, 0xFFC98A4B);
-        float size = h * 0.5f, tw = gfx.width(text, size), maxW = r - l - h * 0.6f;
-        gfx.textC(c, text, (l + r) / 2, (t + b) / 2, tw > maxW ? size * maxW / tw : size, Color.WHITE, 0xFF3A1F08, Paint.Align.CENTER);
+        float left = l;
+        if (icon >= 0) {
+            drawIcon(c, icon, l + h * 0.62f, (t + b) / 2, h * 0.9f);
+            left = l + h * 0.75f;
+        }
+        float size = h * 0.5f, tw = gfx.width(text, size), maxW = r - left - h * 0.6f;
+        gfx.textC(c, text, (left + r) / 2, (t + b) / 2, tw > maxW ? size * maxW / tw : size, Color.WHITE, 0xFF3A1F08, Paint.Align.CENTER);
     }
 
     private void drawTitle(Canvas c) {
@@ -139,7 +149,7 @@ final class Renderer {
         float m = 3 * v.u, hh = 13 * v.u, hudTop = v.topInset + m;
         // level + moves
         float mw = 27 * v.u;
-        drawPill(c, m + hh + m * 0.8f, hudTop, v.W - m - mw - m * 0.8f, hudTop + hh, Recipes.INGREDIENT[v.level.ingredient()] + " " + (v.level.step + 1) + "/" + v.level.recipe.ingredients.length);
+        drawPill(c, m + hh + m * 0.8f, hudTop, v.W - m - mw - m * 0.8f, hudTop + hh, Recipes.INGREDIENT[v.level.ingredient()] + " " + (v.level.step + 1) + "/" + v.level.recipe.ingredients.length, v.level.ingredient());
         float ml = v.W - m - mw, mr = v.W - m;
         gfx.rrect(c, ml, hudTop + hh * 0.07f, mr, hudTop + hh * 1.07f, hh / 2, Gfx.darken(PANEL, 0.6f));
         gfx.rrect(c, ml, hudTop, mr, hudTop + hh, hh / 2, PANEL);
@@ -200,10 +210,38 @@ final class Renderer {
             gfx.textC(c, p.text, p.x, p.y, p.size * s, Gfx.alpha(p.color, a), Gfx.alpha(0xFF4A2808, a), Paint.Align.CENTER);
         }
 
+        drawIntro(c);
+
         if (v.confirmQuit) {
             drawConfirm(c);
         } else if (v.phase == Phase.TIP) drawTip(c);
         else drawButtons(c);
+    }
+
+    /** At the start of a level: what to collect, with its picture, over the board. */
+    private void drawIntro(Canvas c) {
+        final float life = 2.4f;
+        float t = v.introT;
+        if (t >= life || v.level == null || v.phase == Phase.TIP || v.confirmQuit) return;
+        float a = Math.min(1f, t * 5f) * Math.min(1f, (life - t) * 3f);
+        float pop = 1f + 0.12f * (float) Math.sin(Math.min(1f, t * 3f) * Math.PI);
+        int kind = v.level.ingredient();
+        String count = "Collect " + v.level.goalCounts[0], name = Recipes.INGREDIENT[kind];
+        float cx = v.W / 2, cy = v.by + v.cell * ROWS * 0.4f, w = v.W * 0.84f * pop, h = v.cell * 3.3f * pop;
+        float l = cx - w / 2, rt = cx + w / 2;
+        gfx.rrect(c, l, cy - h / 2 + v.u, rt, cy + h / 2 + v.u, 6 * v.u, Gfx.alpha(0xFF2B1606, 0.5f * a));
+        gfx.rrect(c, l, cy - h / 2, rt, cy + h / 2, 6 * v.u, Gfx.alpha(PANEL, 0.96f * a));
+        gfx.rrectLine(c, l + v.u * 0.4f, cy - h / 2 + v.u * 0.4f, rt - v.u * 0.4f, cy + h / 2 - v.u * 0.4f, 5.6f * v.u, v.u * 0.8f, Gfx.alpha(0xFFFF9B26, a));
+        float isz = h * 0.82f;
+        gfx.circle(c, l + h * 0.62f, cy, isz * 0.55f, Gfx.alpha(0xFFFFF4D2, a));
+        drawIcon(c, kind, l + h * 0.62f, cy, isz, a);
+        float tx = l + h * 1.3f, maxW = rt - tx - 3 * v.u;
+        float s1 = h * 0.27f, s2 = h * 0.38f;
+        float w1 = gfx.width(count, s1), w2 = gfx.width(name, s2);
+        if (w1 > maxW) s1 *= maxW / w1;
+        if (w2 > maxW) s2 *= maxW / w2;
+        gfx.textC(c, count, tx, cy - h * 0.2f, s1, Gfx.alpha(0xFFFFE8B0, a), Gfx.alpha(0xFF3A1F08, a), Paint.Align.LEFT);
+        gfx.textC(c, name, tx, cy + h * 0.16f, s2, Gfx.alpha(Color.WHITE, a), Gfx.alpha(0xFF3A1F08, a), Paint.Align.LEFT);
     }
 
     private void drawTile(Canvas c, Tile t, float extra) {
