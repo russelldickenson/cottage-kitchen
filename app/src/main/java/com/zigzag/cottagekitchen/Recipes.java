@@ -1,4 +1,4 @@
-package com.farmharvest.game;
+package com.zigzag.cottagekitchen;
 
 /** The dishes: the ingredients each one is made of (one level per ingredient) and how it looks. */
 final class Recipes {

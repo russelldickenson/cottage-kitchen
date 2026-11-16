@@ -1,4 +1,4 @@
-package com.farmharvest.game;
+package com.zigzag.cottagekitchen;
 
 /** One crop on the board. x/y are render positions in cell units; r/c are the logical grid cell. */
 final class Tile {

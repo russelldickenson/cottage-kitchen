@@ -1,4 +1,4 @@
-package com.farmharvest.game;
+package com.zigzag.cottagekitchen;
 
 import android.content.Context;
 import android.media.AudioAttributes;

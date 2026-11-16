@@ -1,4 +1,4 @@
-package com.farmharvest.game;
+package com.zigzag.cottagekitchen;
 
 import android.app.Activity;
 import android.os.Build;

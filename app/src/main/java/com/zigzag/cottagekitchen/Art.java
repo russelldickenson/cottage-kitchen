@@ -1,4 +1,4 @@
-package com.farmharvest.game;
+package com.zigzag.cottagekitchen;
 
 /** Artwork indexed by tile type id. Ids below CROPS are matchable crops; the rest are power-up tiles. */
 final class Art {

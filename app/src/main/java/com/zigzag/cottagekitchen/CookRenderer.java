@@ -1,8 +1,8 @@
-package com.farmharvest.game;
+package com.zigzag.cottagekitchen;
 
-import static com.farmharvest.game.Gfx.CREAM;
-import static com.farmharvest.game.Gfx.INK;
-import static com.farmharvest.game.Gfx.WOOD;
+import static com.zigzag.cottagekitchen.Gfx.CREAM;
+import static com.zigzag.cottagekitchen.Gfx.INK;
+import static com.zigzag.cottagekitchen.Gfx.WOOD;
 
 import android.content.Context;
 import android.graphics.Bitmap;

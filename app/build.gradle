@@ -4,11 +4,11 @@ plugins {
 
 // Platform SDK only: no AndroidX, no third-party dependencies.
 android {
-    namespace 'com.farmharvest.game'
+    namespace 'com.zigzag.cottagekitchen'
     compileSdk 36
 
     defaultConfig {
-        applicationId 'com.farmharvest.game'
+        applicationId 'com.zigzag.cottagekitchen'
         minSdk 24
         targetSdk 36
         versionCode 1
@@ -16,15 +16,15 @@ android {
     }
 
     // Release signing comes from the environment (set by build.sh), so no secrets live in this file.
-    // Without FARM_KEYSTORE the release build is simply left unsigned.
-    def keystorePath = System.getenv('FARM_KEYSTORE')
+    // Without COTTAGEKITCHEN_KEYSTORE the release build is simply left unsigned.
+    def keystorePath = System.getenv('COTTAGEKITCHEN_KEYSTORE')
     signingConfigs {
         release {
             if (keystorePath) {
                 storeFile file(keystorePath)
-                storePassword System.getenv('FARM_KEYSTORE_PASSWORD')
-                keyAlias System.getenv('FARM_KEY_ALIAS')
-                keyPassword System.getenv('FARM_KEY_PASSWORD')
+                storePassword System.getenv('COTTAGEKITCHEN_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('COTTAGEKITCHEN_KEY_ALIAS')
+                keyPassword System.getenv('COTTAGEKITCHEN_KEY_PASSWORD')
             }
         }
     }

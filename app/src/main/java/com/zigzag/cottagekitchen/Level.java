@@ -1,4 +1,4 @@
-package com.farmharvest.game;
+package com.zigzag.cottagekitchen;
 
 /**
  * Level definition: one ingredient of one dish to collect, which tiles are on the board, and the move budget.

@@ -1,4 +1,4 @@
-package com.farmharvest.game;
+package com.zigzag.cottagekitchen;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;

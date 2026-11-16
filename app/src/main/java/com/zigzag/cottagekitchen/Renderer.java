@@ -1,12 +1,12 @@
-package com.farmharvest.game;
+package com.zigzag.cottagekitchen;
 
-import static com.farmharvest.game.GameView.COLS;
-import static com.farmharvest.game.GameView.ROWS;
-import static com.farmharvest.game.Gfx.CREAM;
-import static com.farmharvest.game.Gfx.GREEN;
-import static com.farmharvest.game.Gfx.ORANGE;
-import static com.farmharvest.game.Gfx.PANEL;
-import static com.farmharvest.game.Gfx.WOOD;
+import static com.zigzag.cottagekitchen.GameView.COLS;
+import static com.zigzag.cottagekitchen.GameView.ROWS;
+import static com.zigzag.cottagekitchen.Gfx.CREAM;
+import static com.zigzag.cottagekitchen.Gfx.GREEN;
+import static com.zigzag.cottagekitchen.Gfx.ORANGE;
+import static com.zigzag.cottagekitchen.Gfx.PANEL;
+import static com.zigzag.cottagekitchen.Gfx.WOOD;
 
 import android.content.Context;
 import android.graphics.Bitmap;
@@ -19,9 +19,9 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Shader;
 
-import com.farmharvest.game.GameView.Button;
-import com.farmharvest.game.GameView.Phase;
-import com.farmharvest.game.GameView.Screen;
+import com.zigzag.cottagekitchen.GameView.Button;
+import com.zigzag.cottagekitchen.GameView.Phase;
+import com.zigzag.cottagekitchen.GameView.Screen;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -102,7 +102,7 @@ final class Renderer {
     private void drawTitle(Canvas c) {
         c.save();
         c.rotate(-4, v.W / 2, v.H * 0.27f);
-        gfx.text(c, "Harvest", v.W / 2, v.H * 0.27f, v.W * 0.2f, 0xFFFFD43B, 0xFF7A3E0B, Paint.Align.CENTER);
+        gfx.text(c, "Cottage", v.W / 2, v.H * 0.27f, v.W * 0.2f, 0xFFFFD43B, 0xFF7A3E0B, Paint.Align.CENTER);
         gfx.text(c, "Kitchen", v.W / 2, v.H * 0.27f + v.W * 0.2f, v.W * 0.2f, 0xFF7ED957, 0xFF1F5F10, Paint.Align.CENTER);
         c.restore();
         int[] show = {6, 12, 9, 1, 4};

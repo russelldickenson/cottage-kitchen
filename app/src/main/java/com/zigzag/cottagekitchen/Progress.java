@@ -1,4 +1,4 @@
-package com.farmharvest.game;
+package com.zigzag.cottagekitchen;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -12,7 +12,7 @@ final class Progress {
     private final SharedPreferences prefs;
 
     Progress(Context ctx) {
-        prefs = ctx.getSharedPreferences("farm", Context.MODE_PRIVATE);
+        prefs = ctx.getSharedPreferences("cottagekitchen", Context.MODE_PRIVATE);
         unlocked = Math.max(1, Math.min(Level.COUNT, prefs.getInt("unlocked", 1)));
         soundOn = prefs.getBoolean("sound", true);
         for (int t = Art.CROPS; t < Art.COUNT; t++) tipSeen[t] = prefs.getBoolean("tip_" + t, false);

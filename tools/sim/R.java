@@ -1,4 +1,4 @@
-package com.farmharvest.game;
+package com.zigzag.cottagekitchen;
 
 /** Stand-in for the generated R class so the game logic compiles outside Gradle. */
 final class R {
