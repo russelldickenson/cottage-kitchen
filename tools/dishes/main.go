@@ -1,5 +1,6 @@
-// dishes turns artwork (flat-background JPEGs in src/) into transparent square PNGs for the game:
-// dish_*.jpeg become 384px dish pictures (bottom-aligned), crop_*.jpeg become 192px board tiles (centred).
+// dishes turns artwork (flat-background JPEGs or PNGs in src/) into transparent square PNGs for the game:
+// dish_*.jpeg become 384px dish pictures (bottom-aligned), crop_*.jpeg/png become 192px board tiles (centred).
+// Vector sources sit beside their raster: crop_sugar.png was rendered from crop_sugar.svg (macOS: qlmanage -t -s 800 -o . crop_sugar.svg).
 // Usage (from the repo root): go run ./tools/dishes   (or: cd tools/dishes && go run . )
 package main
 
@@ -7,7 +8,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"image/jpeg"
+	_ "image/jpeg"
 	"image/png"
 	"math"
 	"os"
@@ -23,6 +24,9 @@ const (
 // tight lists pictures whose dish has light grey parts (a plate) that a normal tolerance would eat.
 var tight = map[string]float64{"pumpkin_soup": 4.5}
 
+// shrink scales pictures that read too big next to the other tiles (a flat square fills its whole canvas).
+var shrink = map[string]float64{"sugar": 0.75}
+
 // crops restricts a picture to the dish itself when it holds extra props.
 var crops = map[string]image.Rectangle{
 	"honey_cake": image.Rect(330, 90, 1080, 690),
@@ -35,12 +39,12 @@ func main() {
 	}
 	dst := filepath.Join(root, "../../app/src/main/res/drawable-nodpi")
 	var files []string
-	for _, pat := range []string{"dish_*.jpeg", "crop_*.jpeg"} {
+	for _, pat := range []string{"dish_*.jpeg", "crop_*.jpeg", "crop_*.png"} {
 		m, _ := filepath.Glob(filepath.Join(root, "src", pat))
 		files = append(files, m...)
 	}
 	for _, f := range files {
-		name := strings.TrimSuffix(filepath.Base(f), ".jpeg")
+		name := strings.TrimSuffix(strings.TrimSuffix(filepath.Base(f), ".jpeg"), ".png")
 		im := load(f)
 		key := strings.TrimPrefix(strings.TrimPrefix(name, "dish_"), "crop_")
 		if r, ok := crops[key]; ok {
@@ -54,9 +58,13 @@ func main() {
 		im = largest(im)
 		var res *image.NRGBA
 		if strings.HasPrefix(name, "crop_") {
-			res = fit(im, tileSize, 6, false)
+			sc := 1.0
+			if v, ok := shrink[key]; ok {
+				sc = v
+			}
+			res = fit(im, tileSize, 6, false, sc)
 		} else {
-			res = fit(im, dishSize, 8, true)
+			res = fit(im, dishSize, 8, true, 1)
 		}
 		o, _ := os.Create(filepath.Join(dst, name+".png"))
 		png.Encode(o, res)
@@ -71,7 +79,7 @@ func load(p string) *image.NRGBA {
 		panic(err)
 	}
 	defer f.Close()
-	src, err := jpeg.Decode(f)
+	src, _, err := image.Decode(f)
 	if err != nil {
 		panic(err)
 	}
@@ -199,7 +207,7 @@ func largest(im *image.NRGBA) *image.NRGBA {
 }
 
 // fit trims to the content and scales it (area-averaged) to fill a square canvas, bottom-aligned or centred.
-func fit(im *image.NRGBA, out, pad int, bottom bool) *image.NRGBA {
+func fit(im *image.NRGBA, out, pad int, bottom bool, extra float64) *image.NRGBA {
 	b := im.Bounds()
 	minX, minY, maxX, maxY := b.Max.X, b.Max.Y, 0, 0
 	for y := b.Min.Y; y < b.Max.Y; y++ {
@@ -211,7 +219,7 @@ func fit(im *image.NRGBA, out, pad int, bottom bool) *image.NRGBA {
 		}
 	}
 	cw, ch := maxX-minX+1, maxY-minY+1
-	scale := float64(out-2*pad) / float64(max(cw, ch))
+	scale := extra * float64(out-2*pad) / float64(max(cw, ch))
 	nw, nh := int(float64(cw)*scale+0.5), int(float64(ch)*scale+0.5)
 	res := image.NewNRGBA(image.Rect(0, 0, out, out))
 	ox, oy := (out-nw)/2, (out-nh)/2

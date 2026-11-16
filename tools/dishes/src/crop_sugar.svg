@@ -1,0 +1,69 @@
+<svg width="500" height="500" viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background (Light Gray to match original) -->
+  <rect width="100%" height="100%" fill="#e8e8e8" />
+  
+  <!-- Subtle Shadow -->
+  <ellipse cx="250" cy="430" rx="160" ry="20" fill="#cccccc" opacity="0.6" />
+
+  <!-- Sugar Cube Body -->
+  <!-- Rounded square, white fill, thick dark brown outline -->
+  <rect x="100" y="100" width="300" height="300" rx="35" fill="#ffffff" stroke="#4a3020" stroke-width="10" />
+  
+  <!-- Subtle inner shading for depth -->
+  <rect x="105" y="105" width="290" height="290" rx="30" fill="none" stroke="#f0f0f0" stroke-width="4" />
+
+  <defs>
+    <clipPath id="cube"><rect x="105" y="105" width="290" height="290" rx="30" /></clipPath>
+  </defs>
+
+  <!-- Crystal look: facets, bevelled edges, grains and sparkles (all inside the cube) -->
+  <g id="crystal">
+    <g clip-path="url(#cube)">
+    <!-- cut facets catching the light (top left) and falling into shade (bottom right) -->
+    <polygon points="100,230 100,100 230,100 160,160" fill="#d8ebff" />
+    <polygon points="400,270 400,400 270,400 340,340" fill="#cddcf0" />
+    <polygon points="400,100 330,100 400,170" fill="#e2f0ff" />
+    <polygon points="100,400 100,330 170,400" fill="#e2f0ff" />
+    </g>
+    <!-- sugar grains -->
+    <g fill="#c4dcf3">
+      <circle cx="150" cy="330" r="5" />
+      <circle cx="176" cy="352" r="3.5" />
+      <circle cx="322" cy="150" r="4" />
+      <circle cx="350" cy="190" r="3" />
+      <circle cx="250" cy="146" r="3.5" />
+      <circle cx="226" cy="364" r="4" />
+      <circle cx="286" cy="350" r="3" />
+      <circle cx="136" cy="262" r="3" />
+      <circle cx="368" cy="250" r="3.5" />
+    </g>
+    <!-- sparkles -->
+    <g fill="#7cc4f7">
+      <path d="M 170 160 L 177 177 L 194 184 L 177 191 L 170 208 L 163 191 L 146 184 L 163 177 Z" />
+      <path d="M 336 330 L 341 343 L 354 348 L 341 353 L 336 366 L 331 353 L 318 348 L 331 343 Z" />
+      <path d="M 352 140 L 356 150 L 366 154 L 356 158 L 352 168 L 348 158 L 338 154 L 348 150 Z" />
+    </g>
+    <g fill="#ffffff" stroke="#9fd2f8" stroke-width="2">
+      <path d="M 250 120 L 253 128 L 261 131 L 253 134 L 250 142 L 247 134 L 239 131 L 247 128 Z" />
+      <path d="M 134 296 L 137 303 L 144 306 L 137 309 L 134 316 L 131 309 L 124 306 L 131 303 Z" />
+    </g>
+  </g>
+
+  <!-- Face Group -->
+  <g id="face">
+    <!-- Left Eye -->
+    <circle cx="190" cy="240" r="28" fill="#4a3020" />
+    <circle cx="198" cy="230" r="9" fill="#ffffff" /> <!-- Highlight -->
+    
+    <!-- Right Eye -->
+    <circle cx="310" cy="240" r="28" fill="#4a3020" />
+    <circle cx="318" cy="230" r="9" fill="#ffffff" /> <!-- Highlight -->
+    
+    <!-- Rosy Cheeks -->
+    <ellipse cx="155" cy="275" rx="22" ry="14" fill="#ffb6c1" />
+    <ellipse cx="345" cy="275" rx="22" ry="14" fill="#ffb6c1" />
+    
+    <!-- Cute Smile -->
+    <path d="M 230 265 Q 250 285 270 265" fill="none" stroke="#4a3020" stroke-width="7" stroke-linecap="round" />
+  </g>
+</svg>

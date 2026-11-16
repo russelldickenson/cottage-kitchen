@@ -1,5 +1,5 @@
-// pantry draws the milk bottle and sugar cube tiles in the same cartoon style as the other crops.
-// (Flour, honey and egg are real artwork: see tools/dishes.)
+// pantry draws the milk bottle tile in the same cartoon style as the other crops.
+// (Flour, honey, egg and sugar are real artwork: see tools/dishes.)
 // Usage: go run . <res/drawable-nodpi dir>
 package main
 
@@ -177,28 +177,10 @@ func milk() *canvas {
 	return c
 }
 
-func sugar() *canvas {
-	c := newCanvas()
-	front, top, side := color.NRGBA{0xF7, 0xF9, 0xFD, 255}, color.NRGBA{0xFF, 0xFF, 0xFF, 255}, color.NRGBA{0xD3, 0xDA, 0xE8, 255}
-	spark := color.NRGBA{0x8D, 0xCE, 0xFA, 255}
-	c.fill(ellipse(96, 176, 56, 7), color.NRGBA{0, 0, 0, 40})
-	c.body(poly(50, 88, 76, 60, 158, 60, 132, 88), 4, top)
-	c.body(poly(132, 88, 158, 60, 158, 144, 132, 172), 4, side)
-	c.body(rrect(50, 88, 132, 172, 8), 4, front)
-	c.fill(poly(132, 88, 158, 60, 158, 144, 132, 172), side)
-	c.fill(poly(54, 90, 78, 64, 154, 64, 130, 90), top)
-	for _, p := range [][2]float64{{70, 72}, {118, 70}, {140, 112}, {64, 102}} {
-		c.fill(poly(p[0], p[1]-6, p[0]+2, p[1]-2, p[0]+6, p[1], p[0]+2, p[1]+2, p[0], p[1]+6, p[0]-2, p[1]+2, p[0]-6, p[1], p[0]-2, p[1]-2), spark)
-	}
-	c.faceK(91, 128, 17, 0.8)
-	return c
-}
-
 func main() {
 	dir := "."
 	if len(os.Args) > 1 {
 		dir = os.Args[1]
 	}
 	milk().save(filepath.Join(dir, "crop_milk.png"))
-	sugar().save(filepath.Join(dir, "crop_sugar.png"))
 }
