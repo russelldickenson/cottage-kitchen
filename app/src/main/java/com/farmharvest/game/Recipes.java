@@ -50,6 +50,7 @@ final class Recipes {
             r("vanilla_ice_cream", "Vanilla Ice Cream", BOWL, 0xFFF6E7B8, MILK, 2, EGG, 1, HONEY, 1),
             r("blueberry_muffin", "Blueberry Muffins", MUFFIN, 0xFF6D74D9, BLUEBERRY, 2, FLOUR, 1, EGG, 1),
             r("pumpkin_soup", "Pumpkin Soup", BOWL, 0xFFF08A24, PUMPKIN, 2, POTATO, 1, MILK, 1),
+            r("corn_chowder", "Corn Chowder", BOWL, 0xFFF2C94C, CORN, 2, POTATO, 1, MILK, 1),
             r("fruit_salad", "Fruit Salad", BOWL, 0xFFD9456E, STRAWBERRY, 1, APPLE, 1, ORANGE, 1, BLUEBERRY, 1),
             r("apple_pie", "Apple Pie", PIE, 0xFFD8913F, APPLE, 2, FLOUR, 1, EGG, 1, HONEY, 1),
             r("birthday_cake", "Birthday Cake", CAKE, 0xFFF48FB1, EGG, 1, MILK, 1, FLOUR, 1, STRAWBERRY, 1),

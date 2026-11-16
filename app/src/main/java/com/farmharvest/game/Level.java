@@ -13,9 +13,9 @@ final class Level {
 
     /** Move budgets, produced by tools/sim/run.sh (tune) from how fast an expert bot clears each order. */
     private static final int[] MOVES = {
-            11, 13, 16, 11, 14, 16, 13, 15, 16, 12, 13, 15, 11, 13, 14,
-            14, 15, 17, 15, 16, 17, 15, 16, 18, 13, 15, 15, 16, 18, 19,
-            15, 16, 15, 18, 19, 19, 18, 19, 21};
+            11, 14, 16, 10, 14, 16, 13, 15, 16, 12, 13, 15, 11, 13, 14,
+            14, 15, 17, 15, 16, 18, 15, 16, 18, 15, 17, 19, 14, 15, 16,
+            18, 19, 19, 14, 16, 16, 18, 20, 22, 19, 19, 20};
 
     final int number, stage;
     final Recipes.Recipe recipe;
