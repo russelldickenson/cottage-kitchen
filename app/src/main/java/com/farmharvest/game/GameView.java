@@ -30,7 +30,7 @@ public class GameView extends View {
         final RectF r = new RectF();
         String text = "";
         int color = GREEN;
-        boolean circle, locked, pressed, back, speaker, muted;
+        boolean circle, locked, pressed, back, speaker, muted, chef;
         /** Level index when this is a card on the recipe book, else -1. */
         int card = -1;
         /** Hit area only: the screen draws it itself. */
@@ -148,7 +148,7 @@ public class GameView extends View {
             });
         } else if (screen == Screen.TITLE) {
             addSpeaker(m, topInset + m, hh);
-            addWide(W / 2, H * 0.66f, W * 0.6f, 17 * u, "COOK", GREEN, this::goBook);
+            addWide(W / 2, H * 0.66f, W * 0.6f, 17 * u, "COOK", GREEN, this::goBook).chef = true;
         } else if (screen == Screen.RESULT) {
             addBack(m, topInset + m, hh, this::goBook);
             buildResultButtons();

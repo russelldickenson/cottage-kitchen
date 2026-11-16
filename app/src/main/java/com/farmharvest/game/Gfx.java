@@ -152,8 +152,8 @@ final class Gfx {
     }
 
     /** Speaker icon with sound waves, or a cross when muted. */
-    void speaker(Canvas c, float cx, float cy, float r, boolean muted) {
-        fill.setColor(Color.WHITE);
+    void speaker(Canvas c, float cx, float cy, float r, boolean muted, int color) {
+        fill.setColor(color);
         path.reset();
         path.moveTo(cx - r * 0.55f, cy - r * 0.22f);
         path.lineTo(cx - r * 0.25f, cy - r * 0.22f);
@@ -163,7 +163,7 @@ final class Gfx {
         path.lineTo(cx - r * 0.55f, cy + r * 0.22f);
         path.close();
         c.drawPath(path, fill);
-        line.setColor(Color.WHITE);
+        line.setColor(color);
         line.setStrokeWidth(r * 0.14f);
         if (muted) {
             line.setColor(0xFFFF6A5A);
@@ -193,6 +193,22 @@ final class Gfx {
         }
     }
 
+    /** A chef's hat: three puffs over a band, outlined like the artwork. */
+    void chefHat(Canvas c, float cx, float cy, float s) {
+        float o = s * 0.07f;
+        circle(c, cx - 0.23f * s, cy - 0.02f * s, 0.2f * s + o, INK);
+        circle(c, cx + 0.23f * s, cy - 0.02f * s, 0.2f * s + o, INK);
+        circle(c, cx, cy - 0.15f * s, 0.27f * s + o, INK);
+        rrect(c, cx - 0.35f * s - o, cy + 0.02f * s - o, cx + 0.35f * s + o, cy + 0.38f * s + o, 0.08f * s + o, INK);
+        circle(c, cx - 0.23f * s, cy - 0.02f * s, 0.2f * s, 0xFFFFFFFF);
+        circle(c, cx + 0.23f * s, cy - 0.02f * s, 0.2f * s, 0xFFFFFFFF);
+        circle(c, cx, cy - 0.15f * s, 0.27f * s, 0xFFFFFFFF);
+        rrect(c, cx - 0.35f * s, cy + 0.02f * s, cx + 0.35f * s, cy + 0.38f * s, 0.08f * s, 0xFFFFFFFF);
+        rrect(c, cx - 0.35f * s, cy + 0.24f * s, cx + 0.35f * s, cy + 0.38f * s, 0.07f * s, 0xFFE3E8F0);
+        lineSeg(c, cx - 0.1f * s, cy - 0.05f * s, cx - 0.1f * s, cy + 0.1f * s, s * 0.04f, 0xFFE3E8F0);
+        lineSeg(c, cx + 0.1f * s, cy - 0.05f * s, cx + 0.1f * s, cy + 0.1f * s, s * 0.04f, 0xFFE3E8F0);
+    }
+
     void lineSeg(Canvas c, float x1, float y1, float x2, float y2, float w, int color) {
         line.setColor(color);
         line.setStrokeWidth(w);
@@ -211,8 +227,8 @@ final class Gfx {
         c.clipPath(path);
     }
 
-    void backArrow(Canvas c, float cx, float cy, float r) {
-        line.setColor(Color.WHITE);
+    void backArrow(Canvas c, float cx, float cy, float r, int color) {
+        line.setColor(color);
         line.setStrokeWidth(r * 0.3f);
         path.reset();
         path.moveTo(cx + r * 0.2f, cy - r * 0.5f);

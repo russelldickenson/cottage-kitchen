@@ -12,10 +12,12 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
+import android.graphics.LinearGradient;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.Shader;
 
 import com.farmharvest.game.GameView.Button;
 import com.farmharvest.game.GameView.Phase;
@@ -375,30 +377,50 @@ final class Renderer {
         for (Button b : v.buttons) drawButton(c, b);
     }
 
+    private final Paint face = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final RectF faceRect = new RectF();
+
     private void drawButton(Canvas c, Button b) {
         if (b.hidden) return;
         float w = b.r.width(), h = b.r.height();
-        float depth = h * 0.09f;
+        float depth = h * 0.1f, o = Math.max(1.5f, h * 0.05f);
         float off = b.pressed ? depth * 0.8f : 0f;
-        int base = b.locked ? 0xFFA8A8A8 : b.color;
+        // back and sound are quiet cream buttons; the rest are coloured
+        boolean quiet = b.back || b.speaker;
+        int base = b.locked ? 0xFFB9B2A4 : quiet ? 0xFFFFF1CC : b.color;
+        int top = Gfx.lighten(base, 0.3f), bot = Gfx.darken(base, 0.9f);
         float cx = b.r.centerX(), cy = b.r.centerY();
         if (b.circle) {
             float rad = w / 2;
-            gfx.circle(c, cx, cy + depth, rad, Gfx.darken(base, 0.62f));
-            gfx.circle(c, cx, cy + off, rad, base);
-            gfx.circle(c, cx, cy + off, rad * 0.86f, Gfx.lighten(base, 0.18f));
-            gfx.ellipse(c, cx, cy + off - rad * 0.45f, rad * 0.55f, rad * 0.28f, 0x55FFFFFF);
+            gfx.circle(c, cx, cy + depth, rad + o, 0x66000000 | (Gfx.INK & 0xFFFFFF));
+            gfx.circle(c, cx, cy + off, rad + o, Gfx.INK);
+            face.setShader(new LinearGradient(0, cy + off - rad, 0, cy + off + rad, top, bot, Shader.TileMode.CLAMP));
+            c.drawCircle(cx, cy + off, rad, face);
+            gfx.ellipse(c, cx - rad * 0.22f, cy + off - rad * 0.58f, rad * 0.38f, rad * 0.13f, 0x77FFFFFF);
         } else {
-            float rad = h * 0.32f;
-            gfx.rrect(c, b.r.left, b.r.top + depth, b.r.right, b.r.bottom + depth, rad, Gfx.darken(base, 0.62f));
-            gfx.rrect(c, b.r.left, b.r.top + off, b.r.right, b.r.bottom + off, rad, base);
-            gfx.rrect(c, b.r.left + h * 0.08f, b.r.top + off + h * 0.07f, b.r.right - h * 0.08f, b.r.top + off + h * 0.45f, rad * 0.7f, 0x44FFFFFF);
+            float rad = h * 0.34f;
+            gfx.rrect(c, b.r.left - o, b.r.top + depth - o, b.r.right + o, b.r.bottom + depth + o, rad + o, 0x66000000 | (Gfx.INK & 0xFFFFFF));
+            gfx.rrect(c, b.r.left - o, b.r.top + off - o, b.r.right + o, b.r.bottom + off + o, rad + o, Gfx.INK);
+            faceRect.set(b.r.left, b.r.top + off, b.r.right, b.r.bottom + off);
+            face.setShader(new LinearGradient(0, faceRect.top, 0, faceRect.bottom, top, bot, Shader.TileMode.CLAMP));
+            c.drawRoundRect(faceRect, rad, rad, face);
+            gfx.rrect(c, b.r.left + h * 0.2f, b.r.top + off + h * 0.07f, b.r.right - h * 0.2f, b.r.top + off + h * 0.17f, h * 0.05f, 0x66FFFFFF);
         }
-        if (b.back) gfx.backArrow(c, cx, cy + off, w * 0.5f);
-        else if (b.speaker) gfx.speaker(c, cx, cy + off, w * 0.42f, b.muted);
+        face.setShader(null);
+        if (b.back) gfx.backArrow(c, cx - w * 0.02f, cy + off, w * 0.5f, 0xFF6B3F17);
+        else if (b.speaker) gfx.speaker(c, cx, cy + off, w * 0.42f, b.muted, 0xFF6B3F17);
         else if (b.locked) gfx.lock(c, cx, cy + off, w * 0.26f);
         else {
-            gfx.textC(c, b.text, cx, cy + off, h * 0.42f, Color.WHITE, Gfx.darken(base, 0.45f), Paint.Align.CENTER);
+            float size = h * 0.42f;
+            int outline = Gfx.darken(base, 0.4f);
+            if (b.chef) {
+                // a chef's hat beside the label
+                float tw = gfx.width(b.text, size), icon = h * 0.62f, gap = h * 0.18f, x0 = cx - (icon + gap + tw) / 2;
+                gfx.chefHat(c, x0 + icon / 2, cy + off - h * 0.06f, icon);
+                gfx.textC(c, b.text, x0 + icon + gap, cy + off, size, Color.WHITE, outline, Paint.Align.LEFT);
+            } else {
+                gfx.textC(c, b.text, cx, cy + off, size, Color.WHITE, outline, Paint.Align.CENTER);
+            }
         }
     }
 }
