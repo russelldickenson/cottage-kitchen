@@ -20,6 +20,8 @@ final class FarmSim {
         double[][] herd = new double[n][sp], hauled = new double[n][Farm.STOCKS];
         for (int g = 0; g < campaigns; g++) {
             Farm.Herd h = new Farm.Herd();
+            h.house[Farm.CHICKEN] = 1; // a new farm starts with a coop and two hens
+            h.count[Farm.CHICKEN] = 2;
             int coins = 0;
             for (int i = 0; i < n; i++) {
                 Level lv = Level.get(i, h);
@@ -68,7 +70,7 @@ final class FarmSim {
         boolean again = true;
         while (again) {
             again = false;
-            while (h.canHatch()) h.hatch();
+            h.autoHatch();
             for (int sp : order) {
                 if (levelIndex + 2 < Farm.HOUSE_UNLOCK_LEVEL[sp]) continue;
                 int price;

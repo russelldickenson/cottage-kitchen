@@ -291,31 +291,6 @@ final class Gfx {
         c.drawLine(x1, y1, x2, y2, line);
     }
 
-    /** White booster glyphs: extra moves, shuffle, hammer. r is roughly the icon radius. */
-    void boosterIcon(Canvas c, int kind, float cx, float cy, float r) {
-        switch (kind) {
-            case Farm.MOVES:
-                text(c, "+5", cx, cy + r * 0.38f, r * 1.25f, Color.WHITE, 0xFF3A1F08, Paint.Align.CENTER);
-                break;
-            case Farm.SHUFFLE: {
-                float w = r * 0.2f;
-                lineSeg(c, cx - r * 0.65f, cy - r * 0.45f, cx + r * 0.6f, cy + r * 0.45f, w, Color.WHITE);
-                lineSeg(c, cx - r * 0.65f, cy + r * 0.45f, cx + r * 0.6f, cy - r * 0.45f, w, Color.WHITE);
-                polygon(c, Color.WHITE, Color.WHITE, w * 0.3f, cx + r * 0.85f, cy + r * 0.6f, cx + r * 0.35f, cy + r * 0.6f, cx + r * 0.6f, cy + r * 0.15f);
-                polygon(c, Color.WHITE, Color.WHITE, w * 0.3f, cx + r * 0.85f, cy - r * 0.6f, cx + r * 0.35f, cy - r * 0.6f, cx + r * 0.6f, cy - r * 0.15f);
-                break;
-            }
-            default: {
-                c.save();
-                c.rotate(-40, cx, cy);
-                rrect(c, cx - r * 0.12f, cy - r * 0.1f, cx + r * 0.12f, cy + r * 0.95f, r * 0.08f, 0xFF8B5A2B);
-                rrect(c, cx - r * 0.6f, cy - r * 0.7f, cx + r * 0.6f, cy - r * 0.02f, r * 0.14f, 0xFFD9D9D9);
-                rrectLine(c, cx - r * 0.6f, cy - r * 0.7f, cx + r * 0.6f, cy - r * 0.02f, r * 0.14f, r * 0.08f, 0xFF4A4A4A);
-                c.restore();
-            }
-        }
-    }
-
     void clipRRect(Canvas c, RectF r, float rad) {
         path.reset();
         path.addRoundRect(r, rad, rad, Path.Direction.CW);

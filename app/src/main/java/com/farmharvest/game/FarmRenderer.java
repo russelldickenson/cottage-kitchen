@@ -11,10 +11,12 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.RectF;
 
-/** Draws the farm screen (scene, tabs, upgrade cards, level result) and the booster store. State is in FarmHub. */
+import java.util.ArrayList;
+import java.util.List;
+
+/** Draws the farm screen (scene, tabs, upgrade cards, level result). State is in FarmHub. */
 final class FarmRenderer {
     private static final int OUT = 0xFF3E2008, INK = 0xFF6B3F17, PRICE_BAD = 0xFFFF9A8A;
-    static final int[] BOOSTER_COLOR = {ORANGE, BLUE, GREEN};
 
     private static final int RED = 0xFFD9453A;
 
@@ -40,6 +42,13 @@ final class FarmRenderer {
     private final GameView v;
     private final Renderer r;
     private final Gfx gfx;
+    private final RectF stripScene = new RectF();
+    /** Crops flying from the board to the house that uses them, and eggs hatching in the coop. */
+    private final List<Hop> hops = new ArrayList<>();
+    private final List<Hatch> hatches = new ArrayList<>();
+    private final float[] bump = new float[Farm.SPECIES];
+    private final int[] nextHouse = new int[Farm.STOCKS];
+    private int eggsIn;
 
     FarmRenderer(GameView v, Renderer r, Gfx gfx) {
         this.v = v;
@@ -49,9 +58,9 @@ final class FarmRenderer {
 
     // ---------------------------------------------------------------- shared
 
-    private void header(Canvas c, boolean withShop) {
+    private void header(Canvas c) {
         float m = 3 * v.u, hh = 13 * v.u, top = v.topInset + m;
-        float right = withShop ? v.hub.shopRect.left - 2.5f * v.u : v.W - m;
+        float right = v.W - m;
         r.drawCoinPill(c, m + hh + m * 0.8f + hh * 0.4f, top, right, top + hh, Math.round(v.dispCoins));
     }
 
@@ -80,27 +89,56 @@ final class FarmRenderer {
 
     void drawFarm(Canvas c) {
         FarmHub h = v.hub;
-        header(c, true);
-        if (h.result) drawBanner(c);
+        header(c);
+        if (h.compact()) drawBanner(c);
         else gfx.textC(c, "My Farm", v.W / 2, h.titleY, 7.5f * v.u, Color.WHITE, 0xFF1F5F10, Paint.Align.CENTER);
-        drawScene(c);
-        drawStockStrip(c);
-        drawTabs(c);
-        for (int i = 0; i < h.cardCount(); i++) drawCard(c, i);
-        drawShopButton(c);
+        drawScene(c, v.hub.scene, true);
+        if (!h.compact()) {
+            drawStockStrip(c);
+            drawTabs(c);
+            for (int i = 0; i < h.cardCount(); i++) drawCard(c, i);
+        }
         effects(c);
+        if (h.tipOpen) {
+            drawFarmTip(c);
+            return;
+        }
         r.drawButtons(c);
+        if (h.compact() && h.tendBtn != null && h.somethingToBuy()) {
+            // a badge on Tend Farm: there is something affordable to build or buy
+            RectF b = h.tendBtn.r;
+            float rad = 3.2f * v.u, bx = b.right - 4 * v.u, by = b.top + 1 * v.u;
+            gfx.circle(c, bx, by, rad, RED);
+            gfx.circleLine(c, bx, by, rad, 0.5f * v.u, Color.WHITE);
+            gfx.textC(c, "!", bx, by, rad * 1.5f, Color.WHITE, 0, Paint.Align.CENTER);
+        }
     }
 
-    private void drawShopButton(Canvas c) {
-        RectF b = v.hub.shopRect;
-        boolean pressed = v.hub.shopBtn != null && v.hub.shopBtn.pressed;
-        float w = b.width(), depth = w * 0.09f, off = pressed ? depth * 0.8f : 0f;
-        float cx = b.centerX(), cy = b.centerY();
-        gfx.circle(c, cx, cy + depth, w / 2, Gfx.darken(BLUE, 0.62f));
-        gfx.circle(c, cx, cy + off, w / 2, BLUE);
-        gfx.circle(c, cx, cy + off, w * 0.43f, Gfx.lighten(BLUE, 0.18f));
-        gfx.textC(c, "SHOP", cx, cy + off, w * 0.27f, Color.WHITE, Gfx.darken(BLUE, 0.45f), Paint.Align.CENTER);
+    /** The first-run explanation of the farm: what to collect, what it does, and the streak. */
+    private void drawFarmTip(Canvas c) {
+        c.drawColor(Color.argb(150, 0, 0, 0));
+        RectF o = v.tipBox;
+        float u = v.u, ph = o.height();
+        gfx.rrect(c, o.left, o.top + 1.5f * u, o.right, o.bottom + 1.5f * u, 6 * u, Gfx.darken(WOOD, 0.6f));
+        gfx.rrect(c, o.left, o.top, o.right, o.bottom, 6 * u, WOOD);
+        gfx.rrect(c, o.left + u, o.top + u, o.right - u, o.bottom - u, 5 * u, CREAM);
+        gfx.rrect(c, o.left - u, o.top - 3 * u, o.right + u, o.top + ph * 0.14f, 5 * u, ORANGE);
+        gfx.textC(c, "Your farm", o.centerX(), o.top + ph * 0.045f, 7 * u, Color.WHITE, 0xFF7A3E0B, Paint.Align.CENTER);
+        float iy = o.top + ph * 0.24f, step = o.width() / (Farm.STOCKS + 0.4f);
+        for (int k = 0; k < Farm.STOCKS; k++) r.drawIcon(c, Farm.STOCK_TILE[k], o.left + step * (k + 0.7f), iy, step * 0.78f);
+        String[] lines = {
+                "Clear these tiles in a level to fill your farm stock.",
+                "Eggs hatch into hens by themselves. Seed, hay, water and potatoes feed your animals.",
+                "Feed every animal each level to grow a streak, and earn up to double."};
+        float size = 4.2f * u, maxW = o.width() - 12 * u, ly = o.top + ph * 0.38f;
+        for (String t : lines) {
+            for (String line : r.wrap(t, size, maxW)) {
+                gfx.textC(c, line, o.centerX(), ly, size, 0xFF6B3F17, 0, Paint.Align.CENTER);
+                ly += size * 1.3f;
+            }
+            ly += size * 0.55f;
+        }
+        r.drawButtons(c);
     }
 
     private void drawBanner(Canvas c) {
@@ -126,7 +164,7 @@ final class FarmRenderer {
                         on ? 0xFFFFD43B : 0xFFD8CBA8, on ? 0xFFC97700 : 0xFFB5A67E);
             }
         }
-        String detail = "Play " + v.playCoins + "  +  Harvest " + v.saleCoins + (v.animalCoins > 0 ? "  +  Animals " + v.animalCoins : "");
+        String detail = "Market " + v.saleCoins + (v.animalCoins > 0 ? "  +  Animals " + v.animalCoins : "");
         gfx.textC(c, detail, b.centerX(), b.top + h - 2.7f * u, 3.3f * u, 0xFF8B5A2B, 0, Paint.Align.CENTER);
 
         // what went into the farm stock, and how the animals got on
@@ -135,8 +173,10 @@ final class FarmRenderer {
             int n = v.report.hauled[s];
             if (n > 0) haul.append(haul.length() > 0 ? "  " : "").append('+').append(n).append(' ').append(Farm.STOCK_NAME[s].toLowerCase());
         }
+        if (v.report.hatched > 0) haul.append(haul.length() > 0 ? "  ·  " : "").append(v.report.hatched).append(v.report.hatched == 1 ? " chick hatched" : " chicks hatched");
         if (haul.length() == 0) haul.append("No farm stock this time");
-        gfx.textC(c, haul.toString(), b.centerX(), b.top + h - 12.5f * u, 3.6f * u, 0xFF3E7A22, 0, Paint.Align.CENTER);
+        float haulSize = Math.min(3.6f * u, 3.6f * u * (b.width() - 6 * u) / Math.max(1f, gfx.width(haul.toString(), 3.6f * u)));
+        gfx.textC(c, haul.toString(), b.centerX(), b.top + h - 12.5f * u, haulSize, 0xFF3E7A22, 0, Paint.Align.CENTER);
         Farm.Herd hd = v.progress.herd;
         if (v.report.hungry > 0) {
             String hungry = v.report.hungry + (v.report.hungry == 1 ? " animal went hungry" : " animals went hungry") + "  (streak " + v.report.streak + ")";
@@ -144,7 +184,7 @@ final class FarmRenderer {
         } else if (v.report.streak > 0) {
             gfx.textC(c, "All fed! Streak " + v.report.streak + ": +" + v.report.bonusPct + "% animal coins", b.centerX(), b.top + h - 7.8f * u, 3.4f * u, 0xFF3E9E22, 0, Paint.Align.CENTER);
         } else if (!anyHouse(hd)) {
-            gfx.textC(c, "Build a coop below to use your eggs!", b.centerX(), b.top + h - 7.8f * u, 3.4f * u, 0xFF8B5A2B, 0, Paint.Align.CENTER);
+            gfx.textC(c, "Tap Tend Farm to build a coop for your eggs!", b.centerX(), b.top + h - 7.8f * u, 3.4f * u, 0xFF8B5A2B, 0, Paint.Align.CENTER);
         }
     }
 
@@ -219,10 +259,10 @@ final class FarmRenderer {
                 sub = "Locked";
                 break;
             case Progress.ACT_BUILD:
-                sub = "Build the " + Farm.HOUSE_NAME[sp].toLowerCase();
+                sub = "Build · holds " + Farm.capacity(sp, 1);
                 break;
             case Progress.ACT_UPGRADE:
-                sub = "Full " + have + "/" + cap;
+                sub = "Full · +" + (Farm.capacity(sp, lvl + 1) - cap) + " room";
                 break;
             case Progress.ACT_FULL:
                 sub = have + "/" + cap + " max";
@@ -236,11 +276,8 @@ final class FarmRenderer {
                 gfx.lock(c, tx + 2.2f * u, py, 2.4f * u);
                 gfx.textC(c, "Beat level " + (Farm.HOUSE_UNLOCK_LEVEL[sp] - 1), tx + 6 * u, py, 3.6f * u, brown, 0, Paint.Align.LEFT);
                 break;
-            case Progress.ACT_HATCH:
-                gfx.textC(c, "HATCH", tx, py, 4.4f * u, 0xFF3E9E22, 0xFFFFFFFF, Paint.Align.LEFT);
-                break;
-            case Progress.ACT_NEED_EGGS:
-                gfx.textC(c, "Need " + (Farm.EGGS_PER_CHICK - hd.stock[Farm.EGG]) + " more eggs", tx, py, 3.4f * u, brown, 0, Paint.Align.LEFT);
+            case Progress.ACT_HATCHING:
+                gfx.textC(c, "Eggs " + hd.stock[Farm.EGG] + "/" + Farm.EGGS_PER_CHICK, tx, py, 4f * u, 0xFF3E9E22, 0, Paint.Align.LEFT);
                 break;
             case Progress.ACT_FULL:
                 gfx.check(c, tx + 2.2f * u, py, 2.4f * u);
@@ -278,9 +315,12 @@ final class FarmRenderer {
         gfx.rrect(c, s.left + 0.6f * u, s.top + 0.6f * u, s.right - 0.6f * u, s.bottom - 0.6f * u, 2.6f * u, CREAM);
         for (int k = 0; k < Farm.STOCKS; k++) {
             float x = s.left + k * w;
-            r.drawIcon(c, Farm.STOCK_TILE[k], x + 4.3f * u, s.centerY(), 6.8f * u);
+            r.drawIcon(c, Farm.STOCK_TILE[k], x + 3.8f * u, s.centerY(), 6.2f * u);
             int need = hd.need(k), have = hd.stock[k];
-            gfx.textC(c, need > 0 ? have + "/" + need : String.valueOf(have), x + 8.4f * u, s.centerY(), 3.3f * u, need > have ? 0xFFD9822B : INK, 0, Paint.Align.LEFT);
+            boolean low = need > have;
+            gfx.textC(c, String.valueOf(have), x + 7.6f * u, s.centerY() - 2.2f * u, 4.2f * u, low ? 0xFFD9822B : INK, 0, Paint.Align.LEFT);
+            String second = k == Farm.EGG ? "per 5" : need > 0 ? "of " + need : "";
+            gfx.textC(c, second, x + 7.6f * u, s.centerY() + 2.9f * u, 2.7f * u, low ? 0xFFD9822B : 0xFF8B5A2B, 0, Paint.Align.LEFT);
         }
     }
 
@@ -335,13 +375,13 @@ final class FarmRenderer {
 
     // ---------------------------------------------------------------- the scene
 
-    private void drawScene(Canvas c) {
-        RectF s = v.hub.scene;
+    /** The farm scene in s. The hub frames it and labels it; the play screen draws it bare and pulses a house when a crop lands. */
+    private void drawScene(Canvas c, RectF s, boolean hub) {
         Progress p = v.progress;
         Farm.Herd hd = p.herd;
         float u = v.u, ws = s.width(), hs = s.height();
         c.save();
-        gfx.clipRRect(c, s, 4 * u);
+        if (hub) gfx.clipRRect(c, s, 4 * u);
         gfx.rrect(c, s.left, s.top, s.right, s.bottom, 0, 0xFF9DDCF9);
         gfx.circle(c, s.left + ws * 0.90f, s.top + hs * 0.10f, ws * 0.05f, 0xFFFFE066);
         gfx.ellipse(c, s.left + ws * 0.25f, s.top + hs * 0.10f, ws * 0.10f, hs * 0.03f, 0xCCFFFFFF);
@@ -361,6 +401,9 @@ final class FarmRenderer {
             if (!built) c.saveLayerAlpha(s.left, s.top, s.right, s.bottom, 85);
             float[] pos = HOUSE_POS[sp];
             float x = s.left + pos[0] * ws, y = s.top + pos[1] * hs, sz = pos[2] * ws;
+            c.save();
+            float pulse = hub ? 1f : 1f + 0.12f * bump[sp] * (float) Math.sin(bump[sp] * Math.PI);
+            c.scale(pulse, pulse, x, y + 0.4f * sz);
             switch (sp) {
                 case Farm.BEE:
                     hive(c, x, y, sz, hd.house[sp]);
@@ -377,6 +420,7 @@ final class FarmRenderer {
                 default:
                     pen(c, x, y, sz, hd.house[sp]);
             }
+            c.restore();
             if (!built) c.restore();
         }
         if (p.decor[Farm.FLOWERS]) decor(c, s, Farm.FLOWERS);
@@ -384,6 +428,7 @@ final class FarmRenderer {
         drawAnimals(c, s);
         if (p.decor[Farm.FENCE]) decor(c, s, Farm.FENCE);
         c.restore();
+        if (!hub) return;
         gfx.rrectLine(c, s.left, s.top, s.right, s.bottom, 4 * u, 1f * u, WOOD);
 
         int animals = hd.animals();
@@ -397,6 +442,169 @@ final class FarmRenderer {
             gfx.rrect(c, sl, pt, sl + sw + 5 * u, pt + 6 * u, 3 * u, 0xCC2F7A1A);
             gfx.textC(c, st, sl + 2.5f * u + sw / 2, pt + 3 * u, 3.4f * u, Color.WHITE, 0, Paint.Align.CENTER);
         }
+    }
+
+    // ---------------------------------------------------------------- the play-screen strip
+
+    private static final float HOP_TIME = 0.55f, HATCH_TIME = 1.6f;
+
+    /** One crop in flight from the board to a house in the strip. */
+    private static final class Hop {
+        int tile, species;
+        float sx, sy, delay, t;
+        boolean egg;
+    }
+
+    /** An egg cracking open in the coop doorway and a chick hopping out. */
+    private static final class Hatch {
+        float t;
+    }
+
+    /** Forget the last level's flights. */
+    void resetStripEvents() {
+        hops.clear();
+        hatches.clear();
+        java.util.Arrays.fill(bump, 0f);
+        eggsIn = 0;
+    }
+
+    /** A farm-stock tile was cleared at (x, y) on the board: send it to a house that wants it. No house for it, no flight. */
+    void launch(int tileType, float x, float y, float delay) {
+        int stock = Farm.stockOf(tileType);
+        if (stock < 0 || v.farmStrip.height() <= 0) return;
+        Farm.Herd hd = v.progress.herd;
+        int sp = -1;
+        if (stock == Farm.EGG) {
+            if (hd.house[Farm.CHICKEN] > 0) sp = Farm.CHICKEN;
+        } else {
+            for (int k = 0; k < Farm.SPECIES && sp < 0; k++) {
+                int cand = (nextHouse[stock] + k) % Farm.SPECIES;
+                if (hd.house[cand] > 0 && Farm.FEED[cand][stock] > 0) sp = cand;
+            }
+            if (sp >= 0) nextHouse[stock] = sp + 1;
+        }
+        if (sp < 0) return;
+        Hop h = new Hop();
+        h.tile = tileType;
+        h.species = sp;
+        h.sx = x;
+        h.sy = y;
+        h.delay = delay;
+        h.egg = stock == Farm.EGG;
+        hops.add(h);
+    }
+
+    void update(float dt) {
+        for (int i = 0; i < bump.length; i++) bump[i] = Math.max(0f, bump[i] - dt * 4f);
+        for (int i = hops.size() - 1; i >= 0; i--) {
+            Hop h = hops.get(i);
+            if (h.delay > 0) {
+                h.delay -= dt;
+                continue;
+            }
+            h.t += dt / HOP_TIME;
+            if (h.t < 1f) continue;
+            hops.remove(i);
+            float[] d = houseSpot(h.species);
+            bump[h.species] = 1f;
+            v.fx.sparkle(d[0], d[1], v.u, v.cell);
+            if (h.egg) {
+                eggsIn++;
+                if ((v.progress.herd.stock[Farm.EGG] + eggsIn) % Farm.EGGS_PER_CHICK == 0) hatches.add(new Hatch());
+            }
+        }
+        for (int i = hatches.size() - 1; i >= 0; i--) {
+            hatches.get(i).t += dt;
+            if (hatches.get(i).t > HATCH_TIME) hatches.remove(i);
+        }
+    }
+
+    /** The door of a house in the strip, in pixels: where crops land. */
+    float[] houseSpot(int sp) {
+        layoutStrip(v.farmStrip);
+        RectF s = stripScene;
+        float[] pos = HOUSE_POS[sp];
+        return new float[]{s.left + pos[0] * s.width(), s.top + pos[1] * s.height()};
+    }
+
+    /**
+     * The hub's scene, fitted below the goal bar: full width when the strip is tall enough, else scaled down by its height and
+     * centred (the sides are filled with sky and grass). It sits on the strip's bottom edge.
+     */
+    private void layoutStrip(RectF full) {
+        float top = full.top + 12 * v.u, h = full.bottom - top, w = full.width();
+        float vw = Math.min(w, h / 0.62f), vh = Math.min(h, 0.9f * vw);
+        stripScene.set(full.centerX() - vw / 2, full.bottom - vh, full.centerX() + vw / 2, full.bottom);
+    }
+
+    /** Crops in flight, drawn over the board and the strip. */
+    void drawStripFlights(Canvas c) {
+        for (Hop h : hops) {
+            if (h.delay > 0) continue;
+            float[] d = houseSpot(h.species);
+            float t = h.t * h.t * (3 - 2 * h.t);
+            float cpx = (h.sx + d[0]) / 2, cpy = Math.min(h.sy, d[1]) - 10 * v.u;
+            float x = (1 - t) * (1 - t) * h.sx + 2 * (1 - t) * t * cpx + t * t * d[0];
+            float y = (1 - t) * (1 - t) * h.sy + 2 * (1 - t) * t * cpy + t * t * d[1];
+            r.drawIcon(c, h.tile, x, y, v.cell * (0.75f - 0.35f * t));
+        }
+    }
+
+    /** How far above a house's centre its roof peak is, as a fraction of its size: where the hunger tag sits. */
+    private static final float[] TAG_UP = {0.5f, 0.46f, 0.4f, 0.2f, 0.4f};
+
+    /** How many of a species the stock and this level's harvest would feed right now, above its house. Green when all, amber some, red none. */
+    private void hungerTag(Canvas c, RectF s, int sp, int fed) {
+        int animals = v.progress.herd.count[sp];
+        if (animals == 0 || v.progress.herd.house[sp] == 0) return;
+        float[] pos = HOUSE_POS[sp];
+        float u = v.u, size = 3.1f * u, x = s.left + pos[0] * s.width(), y = s.top + pos[1] * s.height() - TAG_UP[sp] * pos[2] * s.width();
+        String label = fed + "/" + animals;
+        float w = gfx.width(label, size) + 4 * u, h = 5 * u;
+        int col = fed >= animals ? 0xDD2F7A1A : fed > 0 ? 0xDDB8741A : 0xDD9E2A24;
+        gfx.rrect(c, x - w / 2, y - h / 2, x + w / 2, y + h / 2, h / 2, col);
+        gfx.textC(c, label, x, y, size, Color.WHITE, 0, Paint.Align.CENTER);
+    }
+
+    /** The farm under the board: the goal bar sits over its sky, the hub's scene fills the rest, with a hunger tag on each house. */
+    void drawStrip(Canvas c, RectF full) {
+        layoutStrip(full);
+        RectF s = stripScene;
+        Farm.Herd hd = v.progress.herd;
+        float u = v.u, ws = s.width(), hs = s.height();
+        gfx.rrect(c, full.left, full.top + 1f * u, full.right, full.bottom + 1f * u, 4 * u, Gfx.darken(WOOD, 0.6f));
+        c.save();
+        gfx.clipRRect(c, full, 4 * u);
+        gfx.rrect(c, full.left, full.top, full.right, full.bottom, 0, 0xFF9DDCF9);
+        gfx.rrect(c, full.left, s.top + hs * 0.36f, full.right, full.bottom, 0, 0xFF8BD450);
+        gfx.rrect(c, full.left, s.top + hs * 0.88f, full.right, full.bottom, 0, 0xFF74C043);
+        drawScene(c, s, false);
+
+        int[] fedNow = hd.provisionalFed(v.harvest);
+        for (int sp = 0; sp < Farm.SPECIES; sp++) hungerTag(c, s, sp, fedNow[sp]);
+        float[] cp = HOUSE_POS[Farm.CHICKEN];
+        float cx = s.left + cp[0] * ws, base = s.top + cp[1] * hs + 0.34f * cp[2] * ws, size = cp[2] * ws;
+        for (Hatch h : hatches) {
+            if (h.t < 0.6f) {
+                c.save();
+                c.rotate((float) Math.sin(h.t * 40) * 14f, cx, base);
+                r.drawIcon(c, Farm.STOCK_TILE[Farm.EGG], cx, base - 0.1f * size, 0.22f * size);
+                c.restore();
+            } else {
+                float k = (h.t - 0.6f) / (HATCH_TIME - 0.6f), hop = (float) Math.abs(Math.sin(k * Math.PI * 3)) * 0.18f * size * (1 - k);
+                chick(c, cx + k * 0.4f * size, base + 0.06f * size - hop, 0.17f * size * Math.min(1f, k * 6f), 1f, h.t * 4f);
+            }
+        }
+        boolean any = false;
+        for (int h : hd.house) any |= h > 0;
+        if (!any) {
+            String msg = "Build a coop in My Farm to fill this field";
+            float tsz = 3.6f * u, tw = gfx.width(msg, tsz), pl = full.centerX() - tw / 2 - 2.5f * u, pt = full.top + 15 * u;
+            gfx.rrect(c, pl, pt, pl + tw + 5 * u, pt + 6 * u, 3 * u, 0xCC6B3F17);
+            gfx.textC(c, msg, full.centerX(), pt + 3 * u, tsz, Color.WHITE, 0, Paint.Align.CENTER);
+        }
+        c.restore();
+        gfx.rrectLine(c, full.left, full.top, full.right, full.bottom, 4 * u, 1f * u, WOOD);
     }
 
     private static boolean anyHouse(Farm.Herd hd) {
@@ -708,47 +916,5 @@ final class FarmRenderer {
         gfx.ellipse(c, cx, cy - 0.1f * s, 0.12f * s, 0.3f * s, 0xFFFFD43B);
         gfx.ellipse(c, cx, cy - 0.1f * s, 0.04f * s, 0.3f * s, CREAM);
         gfx.circleLine(c, cx, cy - 0.1f * s, 0.3f * s, 0.025f * s, OUT);
-    }
-
-    // ---------------------------------------------------------------- booster store
-
-    void drawShop(Canvas c) {
-        header(c, false);
-        FarmHub h = v.hub;
-        Progress p = v.progress;
-        float u = v.u;
-        gfx.textC(c, "General Store", v.W / 2, h.shopTitleY, 7.5f * u, Color.WHITE, 0xFF1F5F10, Paint.Align.CENTER);
-        for (int k = 0; k < Farm.BOOSTERS; k++) {
-            RectF rr = h.shopRow[k];
-            gfx.rrect(c, rr.left, rr.top + 1f * u, rr.right, rr.bottom + 1f * u, 4 * u, Gfx.darken(WOOD, 0.6f));
-            gfx.rrect(c, rr.left, rr.top, rr.right, rr.bottom, 4 * u, WOOD);
-            gfx.rrect(c, rr.left + 0.7f * u, rr.top + 0.7f * u, rr.right - 0.7f * u, rr.bottom - 0.7f * u, 3.4f * u, CREAM);
-
-            float ix = rr.left + 11 * u, iy = rr.centerY(), ir = 8 * u;
-            int col = BOOSTER_COLOR[k];
-            gfx.circle(c, ix, iy + 1f * u, ir, Gfx.darken(col, 0.62f));
-            gfx.circle(c, ix, iy, ir, col);
-            gfx.circle(c, ix, iy, ir * 0.86f, Gfx.lighten(col, 0.18f));
-            gfx.boosterIcon(c, k, ix, iy, ir * 0.62f);
-
-            gfx.textC(c, Farm.BOOSTER_NAME[k], rr.left + 22 * u, iy - 6.5f * u, 5.4f * u, INK, 0, Paint.Align.LEFT);
-            gfx.textC(c, Farm.BOOSTER_INFO[k], rr.left + 22 * u, iy, 3.5f * u, 0xFF8B5A2B, 0, Paint.Align.LEFT);
-            gfx.textC(c, "Owned: " + p.boosters[k], rr.left + 22 * u, iy + 6.5f * u, 4.2f * u, 0xFF3E9E22, 0, Paint.Align.LEFT);
-
-            RectF chip = h.buyChip(k);
-            boolean ok = p.totalCoins >= Farm.BOOSTER_PRICE[k];
-            boolean pressed = h.shopBuy[k] != null && h.shopBuy[k].pressed;
-            float off = pressed ? 0.6f * u : 0f, ch = chip.height();
-            int base = ok ? GREEN : 0xFFA8A8A8;
-            gfx.rrect(c, chip.left, chip.top + 0.9f * u, chip.right, chip.bottom + 0.9f * u, ch * 0.4f, Gfx.darken(base, 0.62f));
-            gfx.rrect(c, chip.left, chip.top + off, chip.right, chip.bottom + off, ch * 0.4f, base);
-            gfx.textC(c, "BUY", chip.centerX(), chip.top + ch * 0.27f + off, 3.8f * u, Color.WHITE, Gfx.darken(base, 0.45f), Paint.Align.CENTER);
-            priceChip(c, chip.centerX(), chip.top + ch * 0.68f + off, Farm.BOOSTER_PRICE[k], ok, 3.9f * u);
-        }
-        float ty = h.shopRow[2].bottom + 8 * u;
-        gfx.textC(c, "Boosters also sit under the board", v.W / 2, ty, 4f * u, Color.WHITE, 0xFF1F5F10, Paint.Align.CENTER);
-        gfx.textC(c, "during a level. Tap one to use it!", v.W / 2, ty + 5.5f * u, 4f * u, Color.WHITE, 0xFF1F5F10, Paint.Align.CENTER);
-        effects(c);
-        r.drawButtons(c);
     }
 }

@@ -1,22 +1,15 @@
 package com.farmharvest.game;
 
 /**
- * Farm economy: crop prices, the livestock (five species, each with its own house, feed and payout), decorations and
- * boosters. No Android types.
+ * Farm economy: crop prices, the livestock (five species, each with its own house, feed and payout) and decorations.
  */
 final class Farm {
     /**
      * What one harvested crop sells for at the end of a level, indexed by crop id.
      * Eggs, potatoes, hay, sunflower seed and water are 0: they go into the farm stock instead (see STOCK_TILE).
      */
-    static final int[] BASE_PRICE = {8, 10, 8, 12, 8, 16, 0, 0, 18, 0, 0, 20, 0};
+    static final int[] BASE_PRICE = {24, 30, 24, 36, 24, 48, 0, 0, 54, 0, 0, 60, 0};
 
-    // boosters
-    static final int MOVES = 0, SHUFFLE = 1, HAMMER = 2, BOOSTERS = 3;
-    static final String[] BOOSTER_NAME = {"Extra Moves", "Shuffle", "Hammer"};
-    static final String[] BOOSTER_INFO = {"Adds 5 moves.", "Reshuffles the board.", "Smashes any one tile."};
-    static final int[] BOOSTER_PRICE = {400, 250, 350};
-    static final int EXTRA_MOVES = 5;
 
     // ---- farm stock: tiles cleared on the board that are kept for the animals
     static final int EGG = 0, SEED = 1, HAY = 2, WATER = 3, POTATO = 4, STOCKS = 5;
@@ -106,7 +99,7 @@ final class Farm {
         /** Tiles brought in from the board, per stock (before the cap). */
         final int[] hauled = new int[STOCKS];
         final int[] fed = new int[SPECIES];
-        int hungry, grown, coins, soldOverflow;
+        int hungry, grown, hatched, coins, soldOverflow;
         /** Fed streak after this level, and the payout bonus it earned this level. */
         int streak, bonusPct, bonusCoins;
     }
@@ -190,6 +183,35 @@ final class Farm {
             chicks[0]++;
         }
 
+        /** Eggs hatch by themselves whenever there are 5 and room in the coop. Returns how many chicks hatched. */
+        int autoHatch() {
+            int n = 0;
+            while (canHatch()) {
+                hatch();
+                n++;
+            }
+            return n;
+        }
+
+        /** How many animals of each species the stock plus what this level has harvested so far would feed right now. Mirrors endLevel's feeding. */
+        int[] provisionalFed(int[] harvest) {
+            int[] avail = new int[STOCKS];
+            System.arraycopy(stock, 0, avail, 0, STOCKS);
+            for (int t = 0; t < harvest.length; t++) {
+                int s = stockOf(t);
+                if (s >= 0) avail[s] += harvest[t];
+            }
+            for (int s = 0; s < STOCKS; s++) avail[s] = Math.min(avail[s], cap(s));
+            int[] fed = new int[SPECIES];
+            for (int sp : FEED_ORDER) {
+                int f = count[sp];
+                for (int s = 0; s < STOCKS; s++) if (FEED[sp][s] > 0) f = Math.min(f, avail[s] / FEED[sp][s]);
+                for (int s = 0; s < STOCKS; s++) avail[s] -= f * FEED[sp][s];
+                fed[sp] = f;
+            }
+            return fed;
+        }
+
         /** The end-of-level farm step: bank the harvest, feed and pay the herd, grow the chicks. */
         Report endLevel(int[] harvest) {
             Report rp = new Report();
@@ -229,6 +251,7 @@ final class Farm {
             count[CHICKEN] += rp.grown;
             for (int i = chicks.length - 1; i > 0; i--) chicks[i] = chicks[i - 1];
             chicks[0] = 0;
+            rp.hatched = autoHatch();
             return rp;
         }
     }

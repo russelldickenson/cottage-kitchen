@@ -10,8 +10,8 @@ import java.util.Set;
 /** Pure match-3 rules shared by the game and the level simulator. No Android types in here. */
 final class Rules {
     static final int COLS = 7, ROWS = 8;
-    // Coin rewards. Crops sold at the market are the main income; these are the pocket money.
-    static final int TILE_COINS = 4, LONG_RUN_BONUS = 6, SPECIAL_TILE_COINS = 5, MOVE_BONUS = 10;
+    // Matching pays nothing by itself any more: coins come from fed animals and from selling the harvest.
+    static final int TILE_COINS = 0, LONG_RUN_BONUS = 0, SPECIAL_TILE_COINS = 0, MOVE_BONUS = 0;
 
     /** Power-up tiles a clear should leave behind. */
     static final class Spawns {

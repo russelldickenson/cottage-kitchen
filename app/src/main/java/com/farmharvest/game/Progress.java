@@ -3,13 +3,12 @@ package com.farmharvest.game;
 import android.content.Context;
 import android.content.SharedPreferences;
 
-/** Everything that survives between sessions: levels, coins, farm upgrades, decorations, boosters and tutorial cards seen. */
+/** Everything that survives between sessions: levels, coins, farm upgrades, decorations and tutorial cards seen. */
 final class Progress {
     int unlocked, totalCoins;
-    boolean soundOn;
+    boolean soundOn, farmTipSeen;
     final int[] bestStars = new int[Level.COUNT];
     final boolean[] tipSeen = new boolean[Art.COUNT];
-    final int[] boosters = new int[Farm.BOOSTERS];
     final Farm.Herd herd = new Farm.Herd();
     final boolean[] decor = new boolean[Farm.DECORS];
     private final SharedPreferences prefs;
@@ -19,12 +18,19 @@ final class Progress {
         unlocked = Math.max(1, prefs.getInt("unlocked", 1));
         totalCoins = prefs.getInt("coins", 0);
         soundOn = prefs.getBoolean("sound", true);
+        farmTipSeen = prefs.getBoolean("tip_farm", false);
         for (int t = Art.CROPS; t < Art.COUNT; t++) tipSeen[t] = prefs.getBoolean("tip_" + t, false);
         for (int i = 0; i < Level.COUNT; i++) bestStars[i] = prefs.getInt("stars_" + i, 0);
-        for (int i = 0; i < boosters.length; i++) boosters[i] = prefs.getInt("booster_" + i, 0);
         for (int i = 0; i < decor.length; i++) decor[i] = prefs.getBoolean("decor_" + i, false);
+        boolean freshInstall = !prefs.contains("unlocked") && !prefs.contains("coins") && !prefs.contains("house_0");
         loadHerd();
         refundOldUpgrades();
+        if (freshInstall) {
+            // a new farm starts with a coop and two hens, so the first level already has animals to feed
+            herd.house[Farm.CHICKEN] = 1;
+            herd.count[Farm.CHICKEN] = 2;
+            saveShop();
+        }
     }
 
     private void loadHerd() {
@@ -54,7 +60,6 @@ final class Progress {
 
     private void saveShop() {
         SharedPreferences.Editor e = prefs.edit().putInt("coins", totalCoins);
-        for (int i = 0; i < boosters.length; i++) e.putInt("booster_" + i, boosters[i]);
         for (int i = 0; i < decor.length; i++) e.putBoolean("decor_" + i, decor[i]);
         for (int i = 0; i < herd.stock.length; i++) e.putInt("stock_" + i, herd.stock[i]);
         for (int i = 0; i < herd.house.length; i++) e.putInt("house_" + i, herd.house[i]);
@@ -80,6 +85,11 @@ final class Progress {
         prefs.edit().putBoolean("sound", on).apply();
     }
 
+    void farmTipShown() {
+        farmTipSeen = true;
+        prefs.edit().putBoolean("tip_farm", true).apply();
+    }
+
     void tipShown(int type) {
         tipSeen[type] = true;
         prefs.edit().putBoolean("tip_" + type, true).apply();
@@ -88,7 +98,7 @@ final class Progress {
     // ---- farm
 
     /** What tapping a species' card does next, in the order a farm grows. */
-    static final int ACT_LOCKED = 0, ACT_BUILD = 1, ACT_HATCH = 2, ACT_NEED_EGGS = 3, ACT_BUY = 4, ACT_UPGRADE = 5, ACT_FULL = 6;
+    static final int ACT_LOCKED = 0, ACT_BUILD = 1, ACT_HATCHING = 2, ACT_BUY = 4, ACT_UPGRADE = 5, ACT_FULL = 6;
 
     boolean houseUnlocked(int sp) {
         return unlocked >= Farm.HOUSE_UNLOCK_LEVEL[sp];
@@ -97,7 +107,7 @@ final class Progress {
     int nextAction(int sp) {
         if (!houseUnlocked(sp)) return ACT_LOCKED;
         if (herd.house[sp] == 0) return ACT_BUILD;
-        if (herd.room(sp) > 0) return sp == Farm.CHICKEN ? (herd.canHatch() ? ACT_HATCH : ACT_NEED_EGGS) : ACT_BUY;
+        if (herd.room(sp) > 0) return sp == Farm.CHICKEN ? ACT_HATCHING : ACT_BUY;
         return herd.house[sp] < Farm.MAX_HOUSE_LEVEL ? ACT_UPGRADE : ACT_FULL;
     }
 
@@ -122,11 +132,8 @@ final class Progress {
                 return "Beat level " + (Farm.HOUSE_UNLOCK_LEVEL[sp] - 1) + " first";
             case ACT_FULL:
                 return "Fully upgraded";
-            case ACT_NEED_EGGS:
-                return "Need " + (Farm.EGGS_PER_CHICK - herd.stock[Farm.EGG]) + " more eggs";
-            case ACT_HATCH:
-                herd.hatch();
-                break;
+            case ACT_HATCHING:
+                return "Eggs hatch on their own";
             default: {
                 int cost = actionPrice(sp);
                 if (totalCoins < cost) return "Not enough coins";
@@ -135,6 +142,7 @@ final class Progress {
                 else herd.house[sp]++;
             }
         }
+        herd.autoHatch();
         saveShop();
         return null;
     }
@@ -150,29 +158,6 @@ final class Progress {
         if (decor[k] || totalCoins < Farm.DECOR_COST[k]) return false;
         totalCoins -= Farm.DECOR_COST[k];
         decor[k] = true;
-        saveShop();
-        return true;
-    }
-
-    // ---- boosters
-
-    boolean buyBooster(int k) {
-        if (totalCoins < Farm.BOOSTER_PRICE[k]) return false;
-        totalCoins -= Farm.BOOSTER_PRICE[k];
-        boosters[k]++;
-        saveShop();
-        return true;
-    }
-
-    /** Uses one booster, buying it on the spot if none are owned. Returns false when it cannot be afforded. */
-    boolean takeBooster(int k) {
-        if (boosters[k] > 0) {
-            boosters[k]--;
-        } else if (totalCoins >= Farm.BOOSTER_PRICE[k]) {
-            totalCoins -= Farm.BOOSTER_PRICE[k];
-        } else {
-            return false;
-        }
         saveShop();
         return true;
     }

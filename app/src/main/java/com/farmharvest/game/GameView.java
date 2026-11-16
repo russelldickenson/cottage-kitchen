@@ -20,7 +20,7 @@ import java.util.Set;
 
 /** Owns the game state, runs the match-3 state machine and handles touch input. Drawing is in Renderer. */
 public class GameView extends View {
-    enum Screen {TITLE, LEVELS, PLAY, FARM, SHOP}
+    enum Screen {TITLE, LEVELS, PLAY, FARM}
 
     enum Phase {IDLE, SWAP, SWAPBACK, CLEAR, FALL, BAG, TIP}
 
@@ -34,8 +34,6 @@ public class GameView extends View {
         boolean circle, locked, pressed, back, speaker, muted;
         /** Hit area only: the screen draws it itself. */
         boolean hidden;
-        /** Booster glyph (Farm.MOVES etc.) for the in-level booster buttons, or -1. */
-        int icon = -1;
         int stars = -1;
         Runnable act;
     }
@@ -54,21 +52,22 @@ public class GameView extends View {
     Rules.Spawns spawns = new Rules.Spawns();
     Tile fxTile;
     float clearDuration = CLEAR_TIME;
-    static final float BAG_PAUSE = 1f, BAG_POP = 0.35f;
-    float bagT, bagEndT, tipT;
+    float bagT, tipT;
+    /** Animal coins already paid out live this level, and how many animals of each species they covered. */
+    int livePaid;
+    int[] paidFed = new int[Farm.SPECIES];
     int pendingTip = -1, tipType;
-    int bagTotal;
     int[] harvest = new int[Art.CROPS];
     /** This level's payout, split up for the result banner on the farm screen. */
-    int playCoins, saleCoins, animalCoins;
+    int saleCoins, animalCoins;
     /** What the farm did when the last level ended (stock hauled in, animals fed). */
     Farm.Report report = new Farm.Report();
-    boolean hammerMode;
-    final RectF[] boosterRect = {new RectF(), new RectF(), new RectF()};
 
     // layout
     float W, H, topInset, botInset, u;
     float bx, by, cell, coinX, coinY, coinR;
+    /** The pasture under the board where the herd is shown during a level. */
+    final RectF farmStrip = new RectF(), bankRect = new RectF();
     final RectF boardPanel = new RectF(), goalPanel = new RectF(), tipBox = new RectF(), confirmBox = new RectF();
 
     // play state
@@ -124,23 +123,20 @@ public class GameView extends View {
     private void layout() {
         float m = 3 * u, hh = 13 * u;
         float hudTop = topInset + m;
-        float goalTop = hudTop + hh + m * 0.8f;
-        goalPanel.set(m, goalTop, W - m, goalTop + 26 * u);
-        float top = goalPanel.bottom + m;
-        float barH = 15 * u;
-        float bottom = H - botInset - m - barH - 8 * u;
-        float pad = 2 * u;
-        float availH = bottom - top;
+        float top = hudTop + hh + m * 0.8f;
+        float pad = 2 * u, minStrip = 38 * u, maxStrip = 0.8f * (W - 2 * m);
+        float bottom = H - botInset - m;
+        float availH = bottom - top - minStrip - 3 * u;
         cell = Math.min((W - 2 * m - 2 * pad) / COLS, (availH - 2 * pad) / ROWS);
         float bw = cell * COLS, bh = cell * ROWS;
         bx = (W - bw) / 2;
-        by = top + Math.min((availH - bh) / 2, 2 * u);
+        by = top + pad;
         boardPanel.set(bx - pad, by - pad, bx + bw + pad, by + bh + pad);
-        float barTop = Math.min(boardPanel.bottom + 7 * u, H - botInset - m - barH - 5 * u);
-        for (int k = 0; k < 3; k++) {
-            float x = W / 2 + (k - 1) * 27 * u - barH / 2;
-            boosterRect[k].set(x, barTop, x + barH, barTop + barH);
-        }
+        // the farm strip takes everything under the board: the level's goals along its top, the pasture below
+        float stripTop = boardPanel.bottom + 3 * u;
+        farmStrip.set(m, stripTop, W - m, Math.min(bottom, stripTop + maxStrip));
+        goalPanel.set(farmStrip.left + u, farmStrip.top + u, farmStrip.right - u, farmStrip.top + 12 * u);
+        bankRect.set(goalPanel.right - 28 * u, goalPanel.top, goalPanel.right, goalPanel.bottom);
         hub.layout();
         tipBox.set(W * 0.1f, H * 0.22f, W * 0.9f, H * 0.78f);
         confirmBox.set(W * 0.1f, H * 0.32f, W * 0.9f, H * 0.68f);
@@ -166,7 +162,7 @@ public class GameView extends View {
             addSpeaker(m, topInset + m, hh);
             addWide(W / 2, H * 0.62f + 8.5f * u, W * 0.6f, 17 * u, "PLAY", GREEN, this::goLevels);
             addWide(W / 2, H * 0.62f + 17 * u + 4 * u + 7.5f * u, W * 0.6f, 15 * u, "MY FARM", ORANGE, () -> goScreen(Screen.FARM));
-        } else if (screen == Screen.FARM || screen == Screen.SHOP) {
+        } else if (screen == Screen.FARM) {
             hub.build(screen);
         } else if (screen == Screen.LEVELS) {
             addBack(m, topInset + m, hh, this::goTitle);
@@ -200,19 +196,7 @@ public class GameView extends View {
             addBack(m, topInset + m, hh, this::askQuit);
             bankBtn = null;
             if (screen == Screen.PLAY && farming && phase != Phase.BAG) {
-                RectF r = boosterRect[1];
-                bankBtn = addWide(W / 2, r.centerY(), W * 0.78f, 14 * u, "BANK MOVES", ORANGE, this::bankMoves);
-            } else if (screen == Screen.PLAY && phase != Phase.BAG) {
-                for (int k = 0; k < Farm.BOOSTERS; k++) {
-                    final int kind = k;
-                    Button b = new Button();
-                    b.r.set(boosterRect[k]);
-                    b.circle = true;
-                    b.icon = k;
-                    b.color = FarmRenderer.BOOSTER_COLOR[k];
-                    b.act = () -> useBooster(kind);
-                    buttons.add(b);
-                }
+                bankBtn = addWide(bankRect.centerX(), bankRect.centerY(), bankRect.width(), bankRect.height(), "FINISH", ORANGE, this::bankMoves);
             }
         }
     }
@@ -280,12 +264,10 @@ public class GameView extends View {
             return true;
         }
         if (screen == Screen.FARM) {
-            if (hub.result) goLevels();
+            if (hub.tipOpen) hub.dismissTip();
+            else if (hub.result && hub.tend) hub.setTend(false);
+            else if (hub.result) goLevels();
             else goTitle();
-            return true;
-        }
-        if (screen == Screen.SHOP) {
-            goScreen(Screen.FARM);
             return true;
         }
         return false;
@@ -311,7 +293,6 @@ public class GameView extends View {
         screen = s;
         phase = Phase.IDLE;
         confirmQuit = false;
-        hammerMode = false;
         if (fromMenu) hub.open();
         else hub.layout();
         buildButtons();
@@ -321,7 +302,6 @@ public class GameView extends View {
     private void goResult() {
         screen = Screen.FARM;
         phase = Phase.IDLE;
-        hammerMode = false;
         hub.showResult();
         dispCoins = Math.max(0, progress.totalCoins - coins);
         buildButtons();
@@ -334,7 +314,6 @@ public class GameView extends View {
 
     void goLevels() {
         confirmQuit = false;
-        hammerMode = false;
         screen = Screen.LEVELS;
         phase = Phase.IDLE;
         buildButtons();
@@ -356,10 +335,12 @@ public class GameView extends View {
         selected = null;
         hint = null;
         fx.clear();
+        renderer.farm.resetStripEvents();
         dying.clear();
         pendingTip = -1;
         harvest = new int[Art.CROPS];
-        hammerMode = false;
+        livePaid = 0;
+        paidFed = new int[Farm.SPECIES];
         for (int r = 0; r < ROWS; r++) {
             for (int c = 0; c < COLS; c++) board.g[r][c].y = r - ROWS - rnd.nextFloat() * 1.5f - (COLS - c) * 0.1f;
         }
@@ -378,10 +359,11 @@ public class GameView extends View {
         else dispCoins += (target - dispCoins) * Math.min(1f, dt * 9f) + Math.signum(target - dispCoins) * dt * 20;
 
         fx.update(dt, u);
-        int coinsIn = fx.takeLanded(), bagIn = fx.takeBagLanded();
-        landed += coinsIn - bagIn;
+        renderer.farm.update(dt);
+        int coinsIn = fx.takeLanded();
+        landed += coinsIn;
         if (coinsIn > 0) sfx.coin();
-        if (bagIn > 0) sfx.bagCoin(1f - Math.max(0, landed) / (float) bagTotal);
+        if (screen == Screen.PLAY && board != null && phase != Phase.BAG) payFedAnimals();
         for (Button b : buttons) if (b != downButton) b.pressed = false;
         if (screen != Screen.PLAY || confirmQuit) return;
 
@@ -450,13 +432,11 @@ public class GameView extends View {
                 }
                 break;
             case BAG:
+                // the level's last coins (the market, the streak bonus) fly in, then the farm shows the result
                 bagT += dt;
-                if (bagT >= BAG_PAUSE + BAG_POP && fx.bagFlyers.isEmpty()) {
-                    if (bagEndT < 0) bagEndT = bagT;
-                    if (bagT - bagEndT > 0.6f) {
-                        sfx.win();
-                        goResult();
-                    }
+                if (bagT > 0.9f && fx.flyers.isEmpty()) {
+                    sfx.win();
+                    goResult();
                 }
                 break;
             case TIP:
@@ -514,17 +494,11 @@ public class GameView extends View {
         boolean first = true;
         for (Board.Run run : runs) {
             int n = run.tiles.size();
-            int gain = Rules.runCoins(n, combo);
-            coins += gain;
-            float ax = 0, ay = 0;
-            int share = gain / n;
             for (int i = 0; i < n; i++) {
                 Tile t = run.tiles.get(i);
-                ax += cx(t);
-                ay += cy(t);
-                fx.coin(cx(t), cy(t), rnd.nextFloat() * 0.12f, i == n - 1 ? gain - share * (n - 1) : share);
                 if (seen.add(t)) {
                     harvest[t.type]++;
+                    renderer.farm.launch(t.type, cx(t), cy(t), rnd.nextFloat() * 0.12f);
                     if (need[t.type] > 0) need[t.type]--;
                     if (!spawns.tiles.contains(t)) {
                         t.dying = true;
@@ -533,7 +507,6 @@ public class GameView extends View {
                     }
                 }
             }
-            addPop("+" + gain, ax / n, ay / n, cell * 0.55f, 0.9f, Color.WHITE);
             if (first && combo > 1) addPop("Combo x" + combo + "!", W / 2, by + cell * 1.2f, cell * 0.8f, 1.1f, 0xFFFFD43B);
             first = false;
         }
@@ -559,11 +532,7 @@ public class GameView extends View {
         swapA = swapB = null;
         List<Tile> list = new ArrayList<>(set);
         list.sort((x, y) -> Integer.compare(Math.abs(x.r - act.r) + Math.abs(x.c - act.c), Math.abs(y.r - act.r) + Math.abs(y.c - act.c)));
-        int gain = Rules.specialCoins(list.size(), combo);
-        coins += gain;
-        int share = gain / list.size();
         float maxDelay = 0;
-        float ax = 0, ay = 0;
         for (int i = 0; i < list.size(); i++) {
             Tile t = list.get(i);
             float d;
@@ -575,12 +544,10 @@ public class GameView extends View {
             dying.add(t);
             if (t.type < Art.CROPS) {
                 harvest[t.type]++;
+                renderer.farm.launch(t.type, cx(t), cy(t), d);
                 if (need[t.type] > 0) need[t.type]--;
             }
             maxDelay = Math.max(maxDelay, d);
-            ax += cx(t);
-            ay += cy(t);
-            fx.coin(cx(t), cy(t), d + rnd.nextFloat() * 0.1f, i == list.size() - 1 ? gain - share * (list.size() - 1) : share);
         }
         act.dyDelay = maxDelay;
         sfx.powerUpPlayed(banner == null ? act.type : Art.TNT);
@@ -588,7 +555,6 @@ public class GameView extends View {
         String name = banner != null ? banner : act.type == Art.GOLDEN_EGG ? "Golden Harvest!" : act.type == Art.TRACTOR ? "Rainbow Roundup!"
                 : act.type == Art.TNT ? "Boom!" : "Scarecrow Sweep!";
         addPop(name, W / 2, by + cell * 1.2f, cell * 0.85f, 1.3f, 0xFFFFD43B);
-        addPop("+" + gain, ax / list.size(), ay / list.size(), cell * 0.65f, 1.0f, Color.WHITE);
     }
 
     private void finishClear() {
@@ -673,103 +639,55 @@ public class GameView extends View {
         return true;
     }
 
-    /** Stops farming and takes the unused moves as coins. */
+    /** Stops farming for the herd and ends the level; the unused moves count toward the stars. */
     private void bankMoves() {
         if (!farming || phase != Phase.IDLE) return;
         endLevel(true);
     }
 
-    private void startBag() {
-        phase = Phase.BAG;
-        bagT = 0;
-        bagEndT = -1;
-        bagTotal = Math.max(1, coins);
-        fx.flyers.clear();
-        landed = coins;
-        fx.bagFlyers.clear();
-        int n = Math.min(26, Math.max(8, coins / 20));
-        int share = coins / n;
-        for (int i = 0; i < n; i++) {
-            fx.bagCoin(BAG_PAUSE + BAG_POP + i * 0.035f, i == n - 1 ? coins - share * (n - 1) : share);
+    /**
+     * An animal is paid the moment the stock on hand plus this level's harvest first covers its feed: its coin flies from
+     * its house to the counter. Whatever is not paid live (the market, the streak bonus) flies in when the level ends.
+     */
+    private void payFedAnimals() {
+        int[] fed = progress.herd.provisionalFed(harvest);
+        for (int sp = 0; sp < Farm.SPECIES; sp++) {
+            int n = fed[sp] - paidFed[sp];
+            if (n <= 0) continue;
+            paidFed[sp] = fed[sp];
+            float[] at = renderer.farm.houseSpot(sp);
+            for (int i = 0; i < n; i++) {
+                coins += Farm.COINS[sp];
+                livePaid += Farm.COINS[sp];
+                fx.coin(at[0], at[1], 0.55f + 0.1f * i, Farm.COINS[sp]);
+            }
+            addPop("+" + n * Farm.COINS[sp], at[0], at[1] - 0.12f * W, cell * 0.6f, 1.0f, 0xFFFFD43B);
         }
     }
 
     private void endLevel(boolean win) {
         won = win;
         if (!win) sfx.lose();
-        bonus = 0;
         stars = 0;
         if (win) {
-            bonus = movesLeft * Rules.MOVE_BONUS;
             stars = Rules.stars(farming ? goalMoves : movesLeft, level.moves);
         }
-        playCoins = coins + bonus;
         saleCoins = Farm.saleValue(harvest);
         report = progress.farmRound(harvest);
         animalCoins = report.coins;
-        int payout = Farm.payout(playCoins, saleCoins, animalCoins);
-        landed += payout - coins;
-        coins = payout;
+        int rest = Math.max(0, saleCoins + animalCoins - livePaid);
+        coins = livePaid + rest;
         progress.levelFinished(levelIndex, stars, coins);
         if (win) {
             phase = Phase.BAG;
-            startBag();
+            bagT = 0;
+            float sx = farmStrip.centerX(), sy = farmStrip.centerY();
+            int n = Math.min(10, Math.max(1, rest / 40));
+            for (int i = 0; i < n; i++) fx.coin(sx, sy, i * 0.06f, i == n - 1 ? rest - (rest / n) * (n - 1) : rest / n);
             buildButtons();
         } else {
             goResult();
         }
-    }
-
-    private void boosterPop(String text, int color) {
-        addPop(text, W / 2, by + cell * 3.5f, cell * 0.8f, 1.3f, color);
-    }
-
-    /** An in-level booster button. Boosters are bought on the spot with coins when none are owned. */
-    private void useBooster(int k) {
-        if (phase != Phase.IDLE || confirmQuit) return;
-        if (k == Farm.HAMMER && hammerMode) {
-            hammerMode = false;
-            return;
-        }
-        hammerMode = false;
-        if (progress.boosters[k] == 0 && progress.totalCoins < Farm.BOOSTER_PRICE[k]) {
-            sfx.badSwap();
-            boosterPop("Need " + Farm.BOOSTER_PRICE[k] + " coins", 0xFFFF7A66);
-            return;
-        }
-        selected = null;
-        hint = null;
-        idleTime = 0;
-        if (k == Farm.HAMMER) {
-            hammerMode = true;
-            boosterPop("Tap a tile to smash it!", 0xFFFFD43B);
-            return;
-        }
-        progress.takeBooster(k);
-        sfx.powerUpMade();
-        if (k == Farm.MOVES) {
-            movesLeft += Farm.EXTRA_MOVES;
-            boosterPop("+" + Farm.EXTRA_MOVES + " moves!", 0xFF9BE15D);
-        } else {
-            board.reshuffle();
-            for (Tile[] row : board.g) for (Tile t : row) t.scale = 0f;
-            boosterPop("Shuffle!", 0xFF9BE15D);
-        }
-    }
-
-    private void smash(Tile t) {
-        hammerMode = false;
-        if (!progress.takeBooster(Farm.HAMMER)) {
-            sfx.badSwap();
-            boosterPop("Need " + Farm.BOOSTER_PRICE[Farm.HAMMER] + " coins", 0xFFFF7A66);
-            return;
-        }
-        selected = null;
-        hint = null;
-        combo = 1;
-        Set<Tile> one = new java.util.LinkedHashSet<>();
-        one.add(t);
-        beginSpecialClear(one, t, "Smash!");
     }
 
     private void attemptSwap(Tile a, Tile b) {
@@ -814,7 +732,7 @@ public class GameView extends View {
             case MotionEvent.ACTION_MOVE:
                 if (downButton != null) {
                     downButton.pressed = downButton.r.contains(x, y);
-                } else if (downTile != null && !dragged && !hammerMode && phase == Phase.IDLE) {
+                } else if (downTile != null && !dragged && phase == Phase.IDLE) {
                     float dx = x - downX, dy = y - downY;
                     if (Math.max(Math.abs(dx), Math.abs(dy)) > cell * 0.4f) {
                         int r = downTile.r, c = downTile.c;
@@ -836,8 +754,6 @@ public class GameView extends View {
                     }
                 } else if (downTile != null && !dragged && phase == Phase.IDLE && tileAt(x, y) == downTile) {
                     tap(downTile);
-                } else if (hammerMode && downTile == null && phase == Phase.IDLE) {
-                    hammerMode = false;
                 }
                 downTile = null;
                 return true;
@@ -851,10 +767,6 @@ public class GameView extends View {
     }
 
     private void tap(Tile t) {
-        if (hammerMode) {
-            smash(t);
-            return;
-        }
         if (selected == null) selected = t;
         else if (selected == t) selected = null;
         else if (Math.abs(selected.r - t.r) + Math.abs(selected.c - t.c) == 1) attemptSwap(selected, t);

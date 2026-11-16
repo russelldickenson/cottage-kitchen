@@ -88,22 +88,28 @@ final class Level {
             chosen[n++] = best;
         }
         int target = chosen[0], herdGoal = score[target] > 0 ? target : -1;
-        int stockGoal = scale + 2;
-        if (herdGoal >= 0) stockGoal = Math.max((int) Math.ceil(0.75 * scale), Math.min(scale + 2, herd.shortfall(target, 0)));
 
-        // kinds: a cash crop, the stock goal, the other stocks, then more cash crops to make five
+        // kinds: a cash crop, the stocks the herd cares about, then more cash crops to make five
         int[] kinds = new int[5];
         kinds[0] = PLAIN[(2 * index) % PLAIN.length];
         for (int i = 0; i < n; i++) kinds[1 + i] = Farm.STOCK_TILE[chosen[i]];
         for (int i = 1 + n; i < 5; i++) kinds[i] = PLAIN[(2 * index + i - n) % PLAIN.length];
 
-        int ng = Math.min(2 + index / 4, 4);
-        int[] gk = new int[ng];
-        int[] gc = new int[ng];
-        for (int j = 0; j < ng; j++) {
-            gk[j] = kinds[j];
-            gc[j] = j == 1 ? stockGoal : scale + 2 * j;
+        // goals: the cash crop, then what the herd is still short of for each stock someone eats (or eggs, to hatch).
+        // A goal is the shortfall, capped at what one level can reasonably harvest; farming mode carries on past the cap.
+        int[] gk = new int[1 + n];
+        int[] gc = new int[1 + n];
+        int ng = 1;
+        gk[0] = kinds[0];
+        gc[0] = scale;
+        for (int i = 0; i < n; i++) {
+            int s = chosen[i];
+            if (herd.want(s) == 0) continue;
+            gk[ng] = Farm.STOCK_TILE[s];
+            gc[ng++] = Math.min(scale + 2, herd.shortfall(s, 0));
         }
+        gk = java.util.Arrays.copyOf(gk, ng);
+        gc = java.util.Arrays.copyOf(gc, ng);
         Level lv = new Level(index + 1, kinds, gk, gc, moves);
         lv.herdGoal = herdGoal;
         return lv;

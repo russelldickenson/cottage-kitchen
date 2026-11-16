@@ -1,7 +1,5 @@
 package com.farmharvest.game;
 
-import static com.farmharvest.game.GameView.BAG_POP;
-import static com.farmharvest.game.GameView.BAG_PAUSE;
 import static com.farmharvest.game.GameView.COLS;
 import static com.farmharvest.game.GameView.ROWS;
 import static com.farmharvest.game.Gfx.CREAM;
@@ -76,7 +74,6 @@ final class Renderer {
         drawBackground(c);
         if (v.screen == Screen.TITLE) drawTitle(c);
         else if (v.screen == Screen.FARM) farm.drawFarm(c);
-        else if (v.screen == Screen.SHOP) farm.drawShop(c);
         else if (v.screen == Screen.LEVELS) drawLevels(c);
         else drawPlay(c);
     }
@@ -156,8 +153,6 @@ final class Renderer {
         gfx.textC(c, String.valueOf(v.movesLeft), (ml + mr) / 2, hudTop + hh * 0.66f, hh * 0.52f,
                 v.movesLeft <= 3 ? 0xFFFF7A66 : Color.WHITE, 0xFF3A1F08, Paint.Align.CENTER);
 
-        if (v.farming && v.bankBtn != null) v.bankBtn.text = "BANK " + v.movesLeft + " MOVES  +" + v.movesLeft * Rules.MOVE_BONUS;
-        drawGoals(c);
 
         // board
         gfx.rrect(c, v.boardPanel.left, v.boardPanel.top + 1.2f * v.u, v.boardPanel.right, v.boardPanel.bottom + 1.2f * v.u, 4 * v.u, Gfx.darken(WOOD, 0.6f));
@@ -195,6 +190,12 @@ final class Renderer {
             c.restore();
         }
 
+        if (v.farmStrip.height() > 0) {
+            farm.drawStrip(c, v.farmStrip);
+            drawGoals(c);
+            farm.drawStripFlights(c);
+        }
+
         for (Effects.Particle p : fx.particles) {
             float a = p.life / p.max;
             gfx.star(c, p.x, p.y, p.size * (0.5f + a), Gfx.alpha(p.color, a), 0);
@@ -216,63 +217,61 @@ final class Renderer {
 
         if (v.confirmQuit) {
             drawConfirm(c);
-        } else if (v.phase == Phase.BAG) {
-            drawBag(c);
-            drawButtons(c);
         } else if (v.phase == Phase.TIP) drawTip(c);
         else drawButtons(c);
     }
 
-    private void drawBag(Canvas c) {
-        float hh = 13 * v.u, hudTop = v.topInset + 3 * v.u;
-        float k = Math.max(0f, Math.min(1f, (v.bagT - BAG_PAUSE) / BAG_POP));
-        c.drawColor(Color.argb((int) (140 * k), 0, 0, 0));
-        // keep the counter bright above the dim layer
-        drawCoinPill(c, 3 * v.u + hh + 3 * v.u * 0.8f + hh * 0.4f, hudTop, v.W - 3 * v.u - 27 * v.u - 3 * v.u * 0.8f, hudTop + hh, Math.max(0, Math.round(v.dispCoins)));
-        if (k <= 0f) return;
-        float s = v.W * 0.55f, bagX = v.W / 2, bagY = v.H * 0.52f;
-        float ease = 1f + 2.70158f * (float) Math.pow(k - 1, 3) + 1.70158f * (float) Math.pow(k - 1, 2);
-        float sc = ease * (1f + 0.1f * fx.bagBump);
-        float mouthY = bagY - 0.5f * s;
-        for (Effects.Flyer f : fx.bagFlyers) {
-            if (f.delay > 0) continue;
-            float t = f.t * f.t;
-            float cpx = (v.coinX + bagX) / 2, cpy = Math.min(v.coinY, mouthY) - 14 * v.u;
-            float x = (1 - t) * (1 - t) * v.coinX + 2 * (1 - t) * t * cpx + t * t * bagX;
-            float y = (1 - t) * (1 - t) * v.coinY + 2 * (1 - t) * t * cpy + t * t * mouthY;
-            gfx.coin(c, x, y, v.cell * (0.34f - 0.1f * t));
-        }
-        float fillFrac = 1f - Math.max(0, v.landed) / (float) v.bagTotal;
-        c.save();
-        c.scale(sc, sc, bagX, bagY + 0.55f * s);
-        gfx.moneyBag(c, bagX, bagY, s, fillFrac);
-        c.restore();
-    }
-
+    /** The level's goals as a bar along the top of the farm strip. While farming for the herd it shows what the herd is still short of, with Bank beside it. */
     private void drawGoals(Canvas c) {
         RectF p = v.goalPanel;
-        gfx.rrect(c, p.left, p.top + v.u, p.right, p.bottom + v.u, 4 * v.u, Gfx.darken(WOOD, 0.7f));
-        gfx.rrect(c, p.left, p.top, p.right, p.bottom, 4 * v.u, WOOD);
-        gfx.rrect(c, p.left + v.u * 0.8f, p.top + v.u * 0.8f, p.right - v.u * 0.8f, p.bottom - v.u * 0.8f, 3.4f * v.u, CREAM);
         if (v.level == null) return;
-        boolean herdAnimals = v.progress.herd.animals() > 0;
-        String title = v.farming ? "GOALS DONE - FARMING FOR THE HERD"
-                : v.level.herdGoal == Farm.EGG ? "LEVEL " + v.level.number + " - HATCH MORE CHICKS"
-                : v.level.herdGoal >= 0 && herdAnimals ? "LEVEL " + v.level.number + " - FEED THE HERD"
-                : "LEVEL " + v.level.number + " - HARVEST GOALS";
-        gfx.textC(c, title, p.centerX(), p.top + p.height() * 0.15f, 3.6f * v.u, v.farming ? 0xFF3E9E22 : 0xFF8B5A2B, 0, Paint.Align.CENTER);
+        gfx.rrect(c, p.left, p.top, p.right, p.bottom, 3.4f * v.u, Gfx.alpha(CREAM, 0.92f));
         int n = v.level.goalKinds.length;
-        float slot = (p.width() - 4 * v.u) / n;
+        // while farming for the herd the Bank button takes the right end of the bar
+        float usable = p.width() - 2 * v.u - (v.farming ? v.bankRect.width() : 0);
+        float slot = usable / n, size = Math.min(p.height() * 0.62f, slot * 0.4f);
         for (int i = 0; i < n; i++) {
             int kind = v.level.goalKinds[i];
-            float x = p.left + 2 * v.u + slot * (i + 0.5f);
-            float iy = p.top + p.height() * 0.5f;
-            float size = Math.min(slot * 0.8f, p.height() * 0.38f);
-            drawIcon(c, kind, x, iy, size);
-            if (v.need[kind] == 0) gfx.check(c, x + size * 0.38f, iy + size * 0.32f, size * 0.26f);
-            gfx.textC(c, v.need[kind] == 0 ? "Done!" : String.valueOf(v.need[kind]), x, p.top + p.height() * 0.84f, 5.4f * v.u,
-                    v.need[kind] == 0 ? 0xFF4CBB2C : Color.WHITE, v.need[kind] == 0 ? 0xFFFFFFFF : 0xFF8B5A2B, Paint.Align.CENTER);
+            float x = p.left + v.u + slot * i, tx = x + size * 1.3f + 1.6f * v.u, tw = slot - size * 1.3f - 2.6f * v.u;
+            boolean done = v.need[kind] == 0;
+            // covered before the level began, by stock carried over from earlier levels: not something the player just did
+            boolean stocked = done && v.level.goalCounts[i] == 0;
+            float iy = p.centerY();
+            drawIcon(c, kind, x + size * 0.6f, iy, size);
+            if (done) gfx.check(c, x + size * 0.95f, iy + size * 0.3f, size * 0.26f);
+            float top = Math.min(5f * v.u, p.height() * 0.42f);
+            if (stocked) gfx.textC(c, "Stocked", tx, p.top + p.height() * 0.36f, top * 0.8f, 0xFF4F7A2A, 0, Paint.Align.LEFT);
+            else gfx.textC(c, done ? "Done!" : String.valueOf(v.need[kind]), tx, p.top + p.height() * 0.36f, top,
+                    done ? 0xFF4CBB2C : Color.WHITE, done ? 0xFFFFFFFF : 0xFF8B5A2B, Paint.Align.LEFT);
+            float ls = 2.7f * v.u;
+            String label = goalLabel(kind, ls, tw);
+            int onHand = Farm.stockOf(kind) >= 0 ? v.progress.herd.stock[Farm.stockOf(kind)] : 0;
+            if (onHand > 0) {
+                // how much was already in stock, when it fits
+                String with = label + " · " + onHand + " in stock", shorter = label + " · " + onHand;
+                label = gfx.width(with, ls) <= tw ? with : gfx.width(shorter, ls) <= tw ? shorter : label;
+            }
+            float lw = gfx.width(label, ls);
+            gfx.textC(c, label, tx, p.top + p.height() * 0.76f, lw > tw ? ls * tw / lw : ls, 0xFF8B5A2B, 0, Paint.Align.LEFT);
         }
+    }
+
+    /** Who a goal is for: the animals that eat a stock, chicks for eggs, the market for everything else. */
+    private String goalLabel(int tile, float size, float maxW) {
+        int stock = Farm.stockOf(tile);
+        if (stock < 0) return "to sell";
+        if (stock == Farm.EGG) return "for chicks";
+        Farm.Herd hd = v.progress.herd;
+        List<String> who = new ArrayList<>();
+        for (int sp = 0; sp < Farm.SPECIES; sp++) {
+            int animals = hd.count[sp] + (sp == Farm.CHICKEN ? hd.chickCount() : 0);
+            if (animals > 0 && Farm.FEED[sp][stock] > 0) who.add(Farm.ANIMAL_NAME[sp].toLowerCase());
+        }
+        if (who.isEmpty()) return "for the herd";
+        // the full list if it fits, then the first species and a count, so the text never has to shrink to unreadable
+        String full = "for " + String.join(", ", who);
+        if (who.size() == 1 || gfx.width(full, size) <= maxW) return full;
+        return "for " + who.get(0) + " +" + (who.size() - 1);
     }
 
     private void drawTile(Canvas c, Tile t, float extra) {
@@ -372,7 +371,7 @@ final class Renderer {
             "Make one by matching 5 in a row.",
     };
 
-    private List<String> wrap(String text, float size, float maxW) {
+    List<String> wrap(String text, float size, float maxW) {
         List<String> lines = new ArrayList<>();
         StringBuilder cur = new StringBuilder();
         for (String word : text.split(" ")) {
@@ -434,27 +433,6 @@ final class Renderer {
     }
 
 
-    /** Glyph, owned-count badge or price, and a pulsing ring while the hammer is armed. */
-    private void drawBoosterButton(Canvas c, Button b, float cx, float cy, float w) {
-        int k = b.icon, owned = v.progress.boosters[k];
-        gfx.boosterIcon(c, k, cx, cy, w * 0.3f);
-        if (k == Farm.HAMMER && v.hammerMode) {
-            gfx.circleLine(c, cx, cy, w * (0.58f + 0.04f * (float) Math.sin(v.time * 10)), w * 0.07f, 0xFFFFFFFF);
-        }
-        if (owned > 0) {
-            float bx = cx + w * 0.38f, by = cy - w * 0.38f, br = w * 0.2f;
-            gfx.circle(c, bx, by, br, 0xFFE5304A);
-            gfx.circleLine(c, bx, by, br, w * 0.04f, 0xFFFFFFFF);
-            gfx.textC(c, String.valueOf(owned), bx, by, br * 1.3f, Color.WHITE, 0, Paint.Align.CENTER);
-        } else {
-            float py = cy + w * 0.5f + v.u * 3.4f, size = v.u * 3.6f;
-            String s = String.valueOf(Farm.BOOSTER_PRICE[k]);
-            float tw = gfx.width(s, size), cr = size * 0.55f, x = cx - (cr * 2 + size * 0.25f + tw) / 2;
-            gfx.coin(c, x + cr, py, cr);
-            gfx.textC(c, s, x + cr * 2 + size * 0.25f, py, size, v.progress.totalCoins >= Farm.BOOSTER_PRICE[k] ? Color.WHITE : 0xFFFF9A8A, 0xFF3A1F08, Paint.Align.LEFT);
-        }
-    }
-
     void drawButtons(Canvas c) {
         for (Button b : v.buttons) drawButton(c, b);
     }
@@ -478,8 +456,7 @@ final class Renderer {
             gfx.rrect(c, b.r.left, b.r.top + off, b.r.right, b.r.bottom + off, rad, base);
             gfx.rrect(c, b.r.left + h * 0.08f, b.r.top + off + h * 0.07f, b.r.right - h * 0.08f, b.r.top + off + h * 0.45f, rad * 0.7f, 0x44FFFFFF);
         }
-        if (b.icon >= 0) drawBoosterButton(c, b, cx, cy + off, w);
-        else if (b.back) gfx.backArrow(c, cx, cy + off, w * 0.5f);
+        if (b.back) gfx.backArrow(c, cx, cy + off, w * 0.5f);
         else if (b.speaker) gfx.speaker(c, cx, cy + off, w * 0.42f, b.muted);
         else if (b.locked) gfx.lock(c, cx, cy + off, w * 0.26f);
         else if (b.circle) {

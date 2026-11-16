@@ -10,7 +10,7 @@ import android.graphics.RectF;
 import com.farmharvest.game.GameView.Button;
 import com.farmharvest.game.GameView.Screen;
 
-/** Layout, state and buttons for the farm screen (shown after every level) and the booster store. */
+/** Layout, state and buttons for the farm screen (shown after every level). */
 final class FarmHub {
     static final int TAB_ANIMALS = 0, TAB_DECOR = 1;
     /** Animals tab: one card per species (coop, barn, sty, pen, hive), then a read-only streak card. */
@@ -20,81 +20,107 @@ final class FarmHub {
 
     /** True when the farm is showing the result of a level that was just played. */
     boolean result;
+    /** After a level the result is a compact view; Tend Farm opens the full farm screen on top of it. */
+    boolean tend;
+    /** The first-run explanation of the farm is showing. */
+    boolean tipOpen;
     int tab;
 
-    final RectF banner = new RectF(), scene = new RectF(), shopRect = new RectF(), stockStrip = new RectF();
+    final RectF banner = new RectF(), scene = new RectF(), stockStrip = new RectF(), tendRect = new RectF();
     final RectF[] tabRect = {new RectF(), new RectF()};
     final RectF[] card = new RectF[Farm.DECORS];
     final Button[] cardBtn = new Button[Farm.DECORS];
     final Button[] tabBtn = new Button[2];
-    Button shopBtn;
+    Button tendBtn;
     float titleY;
 
-    // booster store
-    final RectF[] shopRow = new RectF[Farm.BOOSTERS];
-    final Button[] shopBuy = new Button[Farm.BOOSTERS];
-    float shopTitleY;
 
     FarmHub(GameView v) {
         this.v = v;
         for (int i = 0; i < card.length; i++) card[i] = new RectF();
-        for (int i = 0; i < shopRow.length; i++) shopRow[i] = new RectF();
     }
 
     /** Called when the farm is opened from the title or level menu. */
     void open() {
         result = false;
+        tend = false;
         tab = TAB_ANIMALS;
+        tipOpen = !v.progress.farmTipSeen;
         layout();
     }
 
     void showResult() {
         result = true;
+        tend = false;
         tab = TAB_ANIMALS;
+        tipOpen = !v.progress.farmTipSeen;
         layout();
     }
 
+    void dismissTip() {
+        tipOpen = false;
+        v.progress.farmTipShown();
+        v.buildButtons();
+    }
+
+    /** The level result with a banner and a Tend Farm button, as opposed to the full farm screen. */
+    boolean compact() {
+        return result && !tend;
+    }
+
+    void setTend(boolean on) {
+        tend = on;
+        layout();
+        v.buildButtons();
+    }
+
+    /** True when a coin purchase for any species is affordable right now, to put a badge on Tend Farm. */
+    boolean somethingToBuy() {
+        Progress p = v.progress;
+        for (int sp = 0; sp < Farm.SPECIES; sp++) {
+            int act = p.nextAction(sp);
+            if ((act == Progress.ACT_BUILD || act == Progress.ACT_BUY || act == Progress.ACT_UPGRADE) && p.totalCoins >= p.actionPrice(sp)) return true;
+        }
+        return false;
+    }
+
     void layout() {
-        float u = v.u, m = 3 * u, hh = 13 * u, gap = 2.5f * u, tabH = 8.5f * u, btnH = 13 * u;
+        float u = v.u, m = 3 * u, hh = 13 * u, gap = 2.5f * u, tabH = 8.5f * u, btnH = 13 * u, stripH = 12f * u;
+        boolean compact = compact();
         float y = v.topInset + m + hh + gap;
         titleY = y + 3.5f * u;
-        if (result) {
+        if (compact) {
             banner.set(m, y, v.W - m, y + 34 * u);
             y = banner.bottom + gap;
         } else {
             y += 9 * u;
         }
-        shopRect.set(v.W - m - hh, v.topInset + m, v.W - m, v.topInset + m + hh);
 
         float bottom = v.H - v.botInset - m;
-        float cardsBottom = result ? bottom - btnH - gap : bottom;
-        float avail = cardsBottom - y;
-        float sceneWant = 0.62f * (v.W - 2 * m);
-        float cardH = Math.max(15 * u, Math.min(25 * u, (avail - tabH - 9.5f * u - 5 * gap - sceneWant) / 3f));
-        float stripH = 9.5f * u;
-        float sceneH = Math.min(0.9f * (v.W - 2 * m), avail - tabH - stripH - 5 * gap - 3 * cardH);
-        scene.set(m, y, v.W - m, y + sceneH);
-        stockStrip.set(m, scene.bottom + gap, v.W - m, scene.bottom + gap + stripH);
+        float tw = (v.W - 2 * m - gap) / 2f;
+        if (compact) {
+            // banner, then as much scene as fits, a Tend Farm button and the level buttons
+            tendRect.set(m, bottom - 2 * btnH - gap, v.W - m, bottom - btnH - gap);
+            float sceneH = Math.min(0.9f * (v.W - 2 * m), tendRect.top - gap - y);
+            scene.set(m, y, v.W - m, y + sceneH);
+        } else {
+            float avail = bottom - y;
+            float sceneWant = 0.62f * (v.W - 2 * m);
+            float cardH = Math.max(15 * u, Math.min(25 * u, (avail - tabH - stripH - 5 * gap - sceneWant) / 3f));
+            float sceneH = Math.min(0.9f * (v.W - 2 * m), avail - tabH - stripH - 5 * gap - 3 * cardH);
+            scene.set(m, y, v.W - m, y + sceneH);
+            stockStrip.set(m, scene.bottom + gap, v.W - m, scene.bottom + gap + stripH);
 
-        float tabTop = stockStrip.bottom + gap, tw = (v.W - 2 * m - gap) / 2f;
-        tabRect[0].set(m, tabTop, m + tw, tabTop + tabH);
-        tabRect[1].set(m + tw + gap, tabTop, v.W - m, tabTop + tabH);
+            float tabTop = stockStrip.bottom + gap;
+            tabRect[0].set(m, tabTop, m + tw, tabTop + tabH);
+            tabRect[1].set(m + tw + gap, tabTop, v.W - m, tabTop + tabH);
 
-        float cardsTop = tabTop + tabH + gap;
-        for (int i = 0; i < card.length; i++) {
-            float x = m + (i % 2) * (tw + gap), cy = cardsTop + (i / 2) * (cardH + gap);
-            card[i].set(x, cy, x + tw, cy + cardH);
+            float cardsTop = tabTop + tabH + gap;
+            for (int i = 0; i < card.length; i++) {
+                float x = m + (i % 2) * (tw + gap), cy = cardsTop + (i / 2) * (cardH + gap);
+                card[i].set(x, cy, x + tw, cy + cardH);
+            }
         }
-
-        shopTitleY = v.topInset + m + hh + 6 * u;
-        float sy = shopTitleY + 9 * u;
-        for (int k = 0; k < shopRow.length; k++) shopRow[k].set(m, sy + k * 30 * u, v.W - m, sy + k * 30 * u + 27 * u);
-    }
-
-    RectF buyChip(int k) {
-        RectF r = shopRow[k];
-        float u = v.u;
-        return new RectF(r.right - 31 * u, r.centerY() - 6 * u, r.right - 3 * u, r.centerY() + 6 * u);
     }
 
     /** Cards shown on the current tab. */
@@ -109,9 +135,15 @@ final class FarmHub {
 
     void build(Screen s) {
         float m = 3 * v.u, hh = 13 * v.u;
-        if (s == Screen.FARM) {
-            v.addBack(m, v.topInset + m, hh, result ? v::goLevels : v::goTitle);
-            shopBtn = v.addHit(shopRect, () -> v.goScreen(Screen.SHOP));
+        if (s == Screen.FARM && tipOpen) {
+            float w = v.tipBox.width() * 0.6f, h = v.tipBox.height() * 0.11f;
+            v.addWide(v.tipBox.centerX(), v.tipBox.top + v.tipBox.height() * 0.9f, w, h, "GOT IT!", GREEN, this::dismissTip);
+        } else if (s == Screen.FARM && compact()) {
+            v.addBack(m, v.topInset + m, hh, v::goLevels);
+            tendBtn = v.addWide(tendRect.centerX(), tendRect.centerY(), tendRect.width(), tendRect.height(), "TEND FARM", ORANGE, () -> setTend(true));
+            buildResultButtons();
+        } else if (s == Screen.FARM) {
+            v.addBack(m, v.topInset + m, hh, result ? () -> setTend(false) : v::goTitle);
             for (int t = 0; t < 2; t++) {
                 final int which = t;
                 tabBtn[t] = v.addHit(tabRect[t], () -> {
@@ -123,13 +155,6 @@ final class FarmHub {
             for (int i = 0; i < buttonCount(); i++) {
                 final int idx = i;
                 cardBtn[i] = v.addHit(card[i], () -> buy(idx));
-            }
-            if (result) buildResultButtons();
-        } else {
-            v.addBack(m, v.topInset + m, hh, () -> v.goScreen(Screen.FARM));
-            for (int k = 0; k < Farm.BOOSTERS; k++) {
-                final int kind = k;
-                shopBuy[k] = v.addHit(buyChip(k), () -> buyBooster(kind));
             }
         }
     }
@@ -160,7 +185,11 @@ final class FarmHub {
         String done;
         if (tab == TAB_ANIMALS) {
             int act = p.nextAction(i);
-            done = act == Progress.ACT_BUILD ? "Built!" : act == Progress.ACT_UPGRADE ? "Upgraded!" : act == Progress.ACT_HATCH ? "Chick!" : "Welcome!";
+            if (act == Progress.ACT_HATCHING) {
+                v.fx.pop("Eggs hatch on their own!", c.centerX(), c.centerY(), 5f * v.u, 1f, Color.WHITE, v.W * 0.8f);
+                return;
+            }
+            done = act == Progress.ACT_BUILD ? "Built!" : act == Progress.ACT_UPGRADE ? "Upgraded!" : "Welcome!";
             err = p.tend(i);
         } else {
             if (p.decor[i]) return;
@@ -178,18 +207,6 @@ final class FarmHub {
         } else {
             v.sfx.badSwap();
             v.fx.pop(err, c.centerX(), c.centerY(), 5f * v.u, 1f, 0xFFFF7A66, v.W * 0.8f);
-        }
-    }
-
-    private void buyBooster(int k) {
-        RectF r = shopRow[k];
-        if (v.progress.buyBooster(k)) {
-            v.sfx.coin();
-            v.fx.sparkle(r.left + 12 * v.u, r.centerY(), v.u, v.cell);
-            v.fx.pop("Bought!", r.centerX(), r.centerY(), 6.5f * v.u, 0.9f, Color.WHITE, v.W * 0.8f);
-        } else {
-            v.sfx.badSwap();
-            v.fx.pop("Not enough coins", r.centerX(), r.centerY(), 5.5f * v.u, 1f, 0xFFFF7A66, v.W * 0.8f);
         }
     }
 }
