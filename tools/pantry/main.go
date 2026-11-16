@@ -1,4 +1,5 @@
-// pantry draws the milk bottle and flour sack tiles in the same cartoon style as the other crops.
+// pantry draws the milk bottle and sugar cube tiles in the same cartoon style as the other crops.
+// (Flour, honey and egg are real artwork: see tools/dishes.)
 // Usage: go run . <res/drawable-nodpi dir>
 package main
 
@@ -176,27 +177,6 @@ func milk() *canvas {
 	return c
 }
 
-func flour() *canvas {
-	c := newCanvas()
-	sack, shade, rope := color.NRGBA{0xF6, 0xE6, 0xC2, 255}, color.NRGBA{0xE4, 0xCF, 0xA0, 255}, color.NRGBA{0xC9, 0x8A, 0x4B, 255}
-	c.fill(ellipse(96, 176, 50, 7), color.NRGBA{0, 0, 0, 40})
-	// tuft at the top, then the body
-	c.body(poly(66, 60, 54, 28, 78, 40, 96, 22, 114, 40, 138, 28, 126, 60), 4, sack)
-	c.body(rrect(40, 62, 152, 174, 30), 4, sack)
-	c.fill(rrect(44, 150, 148, 170, 14), shade)
-	c.body(rrect(58, 54, 134, 70, 7), 3, rope)
-	// wheat ear on the front
-	stalk := color.NRGBA{0xD9, 0x9A, 0x1E, 255}
-	c.fill(capsule(96, 110, 96, 84, 3), stalk)
-	for i := 0; i < 3; i++ {
-		y := 84.0 + float64(i)*9
-		c.fill(ellipse(88, y, 5, 3.4), stalk)
-		c.fill(ellipse(104, y, 5, 3.4), stalk)
-	}
-	c.face(96, 132, 20)
-	return c
-}
-
 func sugar() *canvas {
 	c := newCanvas()
 	front, top, side := color.NRGBA{0xF7, 0xF9, 0xFD, 255}, color.NRGBA{0xFF, 0xFF, 0xFF, 255}, color.NRGBA{0xD3, 0xDA, 0xE8, 255}
@@ -220,6 +200,5 @@ func main() {
 		dir = os.Args[1]
 	}
 	milk().save(filepath.Join(dir, "crop_milk.png"))
-	flour().save(filepath.Join(dir, "crop_flour.png"))
 	sugar().save(filepath.Join(dir, "crop_sugar.png"))
 }

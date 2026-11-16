@@ -14,7 +14,7 @@ final class Art {
             R.drawable.crop_watermelon,
             R.drawable.crop_flour,
             R.drawable.crop_sunflower,
-            R.drawable.crop_bee,
+            R.drawable.crop_honey,
             R.drawable.crop_milk,
             R.drawable.crop_sugar,
             R.drawable.crop_water,

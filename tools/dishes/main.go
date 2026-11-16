@@ -1,4 +1,5 @@
-// dishes turns the dish artwork (flat-background JPEGs in src/) into transparent square PNGs for the game.
+// dishes turns artwork (flat-background JPEGs in src/) into transparent square PNGs for the game:
+// dish_*.jpeg become 384px dish pictures (bottom-aligned), crop_*.jpeg become 192px board tiles (centred).
 // Usage (from the repo root): go run ./tools/dishes   (or: cd tools/dishes && go run . )
 package main
 
@@ -14,7 +15,10 @@ import (
 	"strings"
 )
 
-const out = 384
+const (
+	dishSize = 384
+	tileSize = 192
+)
 
 // tight lists pictures whose dish has light grey parts (a plate) that a normal tolerance would eat.
 var tight = map[string]float64{"pumpkin_soup": 4.5}
@@ -30,20 +34,30 @@ func main() {
 		root = "tools/dishes"
 	}
 	dst := filepath.Join(root, "../../app/src/main/res/drawable-nodpi")
-	files, _ := filepath.Glob(filepath.Join(root, "src", "dish_*.jpeg"))
+	var files []string
+	for _, pat := range []string{"dish_*.jpeg", "crop_*.jpeg"} {
+		m, _ := filepath.Glob(filepath.Join(root, "src", pat))
+		files = append(files, m...)
+	}
 	for _, f := range files {
 		name := strings.TrimSuffix(filepath.Base(f), ".jpeg")
 		im := load(f)
-		if r, ok := crops[strings.TrimPrefix(name, "dish_")]; ok {
+		key := strings.TrimPrefix(strings.TrimPrefix(name, "dish_"), "crop_")
+		if r, ok := crops[key]; ok {
 			im = sub(im, r)
 		}
 		tol := 16.0
-		if t, ok := tight[strings.TrimPrefix(name, "dish_")]; ok {
+		if t, ok := tight[key]; ok {
 			tol = t
 		}
 		keyOut(im, tol)
 		im = largest(im)
-		res := fit(im)
+		var res *image.NRGBA
+		if strings.HasPrefix(name, "crop_") {
+			res = fit(im, tileSize, 6, false)
+		} else {
+			res = fit(im, dishSize, 8, true)
+		}
 		o, _ := os.Create(filepath.Join(dst, name+".png"))
 		png.Encode(o, res)
 		o.Close()
@@ -184,8 +198,8 @@ func largest(im *image.NRGBA) *image.NRGBA {
 	return im
 }
 
-// fit trims to the content and scales it (area-averaged) to fill a square canvas, bottom-aligned.
-func fit(im *image.NRGBA) *image.NRGBA {
+// fit trims to the content and scales it (area-averaged) to fill a square canvas, bottom-aligned or centred.
+func fit(im *image.NRGBA, out, pad int, bottom bool) *image.NRGBA {
 	b := im.Bounds()
 	minX, minY, maxX, maxY := b.Max.X, b.Max.Y, 0, 0
 	for y := b.Min.Y; y < b.Max.Y; y++ {
@@ -197,11 +211,13 @@ func fit(im *image.NRGBA) *image.NRGBA {
 		}
 	}
 	cw, ch := maxX-minX+1, maxY-minY+1
-	const pad = 8
 	scale := float64(out-2*pad) / float64(max(cw, ch))
 	nw, nh := int(float64(cw)*scale+0.5), int(float64(ch)*scale+0.5)
 	res := image.NewNRGBA(image.Rect(0, 0, out, out))
-	ox, oy := (out-nw)/2, out-pad-nh
+	ox, oy := (out-nw)/2, (out-nh)/2
+	if bottom {
+		oy = out - pad - nh
+	}
 	for y := 0; y < nh; y++ {
 		for x := 0; x < nw; x++ {
 			x0, x1 := float64(x)/scale, float64(x+1)/scale
