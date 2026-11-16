@@ -37,7 +37,7 @@ final class Renderer {
     private final Paint sky = new Paint();
     private final Paint plain = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path hill1 = new Path(), hill2 = new Path();
-    final FarmRenderer farm;
+    final CookRenderer cook;
     private final Rect src = new Rect();
     private final RectF dst = new RectF();
 
@@ -45,7 +45,7 @@ final class Renderer {
         this.v = v;
         this.gfx = gfx;
         this.fx = fx;
-        this.farm = new FarmRenderer(v, this, gfx);
+        this.cook = new CookRenderer(ctx, v, this, gfx);
         BitmapFactory.Options o = new BitmapFactory.Options();
         o.inScaled = false;
         for (int i = 0; i < Art.COUNT; i++) art[i] = BitmapFactory.decodeResource(ctx.getResources(), Art.RES[i], o);
@@ -73,8 +73,8 @@ final class Renderer {
     void draw(Canvas c) {
         drawBackground(c);
         if (v.screen == Screen.TITLE) drawTitle(c);
-        else if (v.screen == Screen.FARM) farm.drawFarm(c);
-        else if (v.screen == Screen.LEVELS) drawLevels(c);
+        else if (v.screen == Screen.RESULT) cook.drawResult(c);
+        else if (v.screen == Screen.BOOK) cook.drawBook(c);
         else drawPlay(c);
     }
 
@@ -103,48 +103,37 @@ final class Renderer {
         c.drawBitmap(b, src, dst, bmp);
     }
 
-    void drawCoinPill(Canvas c, float l, float t, float r, float b, int value) {
+    /** A wooden pill with a short label in it. */
+    void drawPill(Canvas c, float l, float t, float r, float b, String text) {
         float h = b - t;
         gfx.rrect(c, l, t + h * 0.07f, r, b + h * 0.07f, h / 2, Gfx.darken(PANEL, 0.6f));
         gfx.rrect(c, l, t, r, b, h / 2, PANEL);
         gfx.rrectLine(c, l + h * 0.03f, t + h * 0.03f, r - h * 0.03f, b - h * 0.03f, h / 2, h * 0.06f, 0xFFC98A4B);
-        float s = 1f + 0.25f * fx.bump;
-        c.save();
-        c.scale(s, s, l + h * 0.2f, (t + b) / 2);
-        gfx.coinPile(c, l + h * 0.2f, (t + b) / 2, h * 0.5f);
-        c.restore();
-        gfx.textC(c, String.valueOf(value), l + h * 0.9f, (t + b) / 2, h * 0.55f, Color.WHITE, 0xFF3A1F08, Paint.Align.LEFT);
+        float size = h * 0.5f, tw = gfx.width(text, size), maxW = r - l - h * 0.6f;
+        gfx.textC(c, text, (l + r) / 2, (t + b) / 2, tw > maxW ? size * maxW / tw : size, Color.WHITE, 0xFF3A1F08, Paint.Align.CENTER);
     }
 
     private void drawTitle(Canvas c) {
         c.save();
         c.rotate(-4, v.W / 2, v.H * 0.27f);
-        gfx.text(c, "Farm", v.W / 2, v.H * 0.27f, v.W * 0.24f, 0xFFFFD43B, 0xFF7A3E0B, Paint.Align.CENTER);
-        gfx.text(c, "Harvest", v.W / 2, v.H * 0.27f + v.W * 0.2f, v.W * 0.2f, 0xFF7ED957, 0xFF1F5F10, Paint.Align.CENTER);
+        gfx.text(c, "Harvest", v.W / 2, v.H * 0.27f, v.W * 0.2f, 0xFFFFD43B, 0xFF7A3E0B, Paint.Align.CENTER);
+        gfx.text(c, "Kitchen", v.W / 2, v.H * 0.27f + v.W * 0.2f, v.W * 0.2f, 0xFF7ED957, 0xFF1F5F10, Paint.Align.CENTER);
         c.restore();
-        int[] show = {1, 0, 5, 4, 2};
+        int[] show = {6, 12, 9, 1, 4};
         for (int i = 0; i < show.length; i++) {
             float x = v.W * (0.14f + i * 0.18f);
             float y = v.H * 0.5f - Math.abs((float) Math.sin(v.time * 3 + i * 0.9f)) * 4 * v.u;
             gfx.ellipse(c, x, v.H * 0.5f + v.W * 0.085f, v.W * 0.06f, v.W * 0.012f, 0x33000000);
             drawIcon(c, show[i], x, y, v.W * 0.18f);
         }
-        float m = 3 * v.u, hh = 11 * v.u;
-        drawCoinPill(c, v.W * 0.52f, v.topInset + m, v.W - m, v.topInset + m + hh, Math.round(v.dispCoins));
-        drawButtons(c);
-    }
-
-    private void drawLevels(Canvas c) {
-        float m = 3 * v.u;
-        gfx.textC(c, "Choose a Level", v.W / 2 + 3 * v.u, v.topInset + m + 6.5f * v.u, 7 * v.u, Color.WHITE, 0xFF1F5F10, Paint.Align.CENTER);
         drawButtons(c);
     }
 
     private void drawPlay(Canvas c) {
         float m = 3 * v.u, hh = 13 * v.u, hudTop = v.topInset + m;
-        // coin counter + moves
+        // level + moves
         float mw = 27 * v.u;
-        drawCoinPill(c, m + hh + m * 0.8f + hh * 0.4f, hudTop, v.W - m - mw - m * 0.8f, hudTop + hh, Math.round(v.dispCoins));
+        drawPill(c, m + hh + m * 0.8f, hudTop, v.W - m - mw - m * 0.8f, hudTop + hh, "Level " + v.level.number);
         float ml = v.W - m - mw, mr = v.W - m;
         gfx.rrect(c, ml, hudTop + hh * 0.07f, mr, hudTop + hh * 1.07f, hh / 2, Gfx.darken(PANEL, 0.6f));
         gfx.rrect(c, ml, hudTop, mr, hudTop + hh, hh / 2, PANEL);
@@ -190,24 +179,14 @@ final class Renderer {
             c.restore();
         }
 
-        if (v.farmStrip.height() > 0) {
-            farm.drawStrip(c, v.farmStrip);
-            drawGoals(c);
-            farm.drawStripFlights(c);
+        if (v.kitchen.height() > 0) {
+            cook.drawKitchen(c, v.kitchen);
+            cook.drawFlights(c);
         }
 
         for (Effects.Particle p : fx.particles) {
             float a = p.life / p.max;
             gfx.star(c, p.x, p.y, p.size * (0.5f + a), Gfx.alpha(p.color, a), 0);
-        }
-        for (Effects.Flyer f : fx.flyers) {
-            if (f.delay > 0) continue;
-            float t = f.t * f.t * (3 - 2 * f.t);
-            float cpx = (f.sx + v.coinX) / 2 + (f.sx < v.W / 2 ? -1 : 1) * 10 * v.u;
-            float cpy = Math.min(f.sy, v.coinY) - 12 * v.u;
-            float x = (1 - t) * (1 - t) * f.sx + 2 * (1 - t) * t * cpx + t * t * v.coinX;
-            float y = (1 - t) * (1 - t) * f.sy + 2 * (1 - t) * t * cpy + t * t * v.coinY;
-            gfx.coin(c, x, y, v.cell * (0.3f - 0.12f * t));
         }
         for (Effects.Pop p : fx.pops) {
             float a = Math.min(1f, p.life / (p.max * 0.4f));
@@ -219,59 +198,6 @@ final class Renderer {
             drawConfirm(c);
         } else if (v.phase == Phase.TIP) drawTip(c);
         else drawButtons(c);
-    }
-
-    /** The level's goals as a bar along the top of the farm strip. While farming for the herd it shows what the herd is still short of, with Bank beside it. */
-    private void drawGoals(Canvas c) {
-        RectF p = v.goalPanel;
-        if (v.level == null) return;
-        gfx.rrect(c, p.left, p.top, p.right, p.bottom, 3.4f * v.u, Gfx.alpha(CREAM, 0.92f));
-        int n = v.level.goalKinds.length;
-        // while farming for the herd the Bank button takes the right end of the bar
-        float usable = p.width() - 2 * v.u - (v.farming ? v.bankRect.width() : 0);
-        float slot = usable / n, size = Math.min(p.height() * 0.62f, slot * 0.4f);
-        for (int i = 0; i < n; i++) {
-            int kind = v.level.goalKinds[i];
-            float x = p.left + v.u + slot * i, tx = x + size * 1.3f + 1.6f * v.u, tw = slot - size * 1.3f - 2.6f * v.u;
-            boolean done = v.need[kind] == 0;
-            // covered before the level began, by stock carried over from earlier levels: not something the player just did
-            boolean stocked = done && v.level.goalCounts[i] == 0;
-            float iy = p.centerY();
-            drawIcon(c, kind, x + size * 0.6f, iy, size);
-            if (done) gfx.check(c, x + size * 0.95f, iy + size * 0.3f, size * 0.26f);
-            float top = Math.min(5f * v.u, p.height() * 0.42f);
-            if (stocked) gfx.textC(c, "Stocked", tx, p.top + p.height() * 0.36f, top * 0.8f, 0xFF4F7A2A, 0, Paint.Align.LEFT);
-            else gfx.textC(c, done ? "Done!" : String.valueOf(v.need[kind]), tx, p.top + p.height() * 0.36f, top,
-                    done ? 0xFF4CBB2C : Color.WHITE, done ? 0xFFFFFFFF : 0xFF8B5A2B, Paint.Align.LEFT);
-            float ls = 2.7f * v.u;
-            String label = goalLabel(kind, ls, tw);
-            int onHand = Farm.stockOf(kind) >= 0 ? v.progress.herd.stock[Farm.stockOf(kind)] : 0;
-            if (onHand > 0) {
-                // how much was already in stock, when it fits
-                String with = label + " · " + onHand + " in stock", shorter = label + " · " + onHand;
-                label = gfx.width(with, ls) <= tw ? with : gfx.width(shorter, ls) <= tw ? shorter : label;
-            }
-            float lw = gfx.width(label, ls);
-            gfx.textC(c, label, tx, p.top + p.height() * 0.76f, lw > tw ? ls * tw / lw : ls, 0xFF8B5A2B, 0, Paint.Align.LEFT);
-        }
-    }
-
-    /** Who a goal is for: the animals that eat a stock, chicks for eggs, the market for everything else. */
-    private String goalLabel(int tile, float size, float maxW) {
-        int stock = Farm.stockOf(tile);
-        if (stock < 0) return "to sell";
-        if (stock == Farm.EGG) return "for chicks";
-        Farm.Herd hd = v.progress.herd;
-        List<String> who = new ArrayList<>();
-        for (int sp = 0; sp < Farm.SPECIES; sp++) {
-            int animals = hd.count[sp] + (sp == Farm.CHICKEN ? hd.chickCount() : 0);
-            if (animals > 0 && Farm.FEED[sp][stock] > 0) who.add(Farm.ANIMAL_NAME[sp].toLowerCase());
-        }
-        if (who.isEmpty()) return "for the herd";
-        // the full list if it fits, then the first species and a count, so the text never has to shrink to unreadable
-        String full = "for " + String.join(", ", who);
-        if (who.size() == 1 || gfx.width(full, size) <= maxW) return full;
-        return "for " + who.get(0) + " +" + (who.size() - 1);
     }
 
     private void drawTile(Canvas c, Tile t, float extra) {
@@ -459,17 +385,7 @@ final class Renderer {
         if (b.back) gfx.backArrow(c, cx, cy + off, w * 0.5f);
         else if (b.speaker) gfx.speaker(c, cx, cy + off, w * 0.42f, b.muted);
         else if (b.locked) gfx.lock(c, cx, cy + off, w * 0.26f);
-        else if (b.circle) {
-            boolean hasStars = b.stars >= 0;
-            gfx.textC(c, b.text, cx, cy + off - (hasStars ? w * 0.06f : 0), w * 0.42f, Color.WHITE, Gfx.darken(base, 0.45f), Paint.Align.CENTER);
-            if (hasStars) {
-                for (int i = 0; i < 3; i++) {
-                    boolean on = i < b.stars;
-                    gfx.star(c, cx + (i - 1) * w * 0.22f, cy + off + w * 0.31f - (i == 1 ? 0 : w * 0.03f), w * 0.1f,
-                            on ? 0xFFFFD43B : 0xFF7A8F60, on ? 0xFFC97700 : 0xFF4E5E3C);
-                }
-            }
-        } else {
+        else {
             gfx.textC(c, b.text, cx, cy + off, h * 0.42f, Color.WHITE, Gfx.darken(base, 0.45f), Paint.Align.CENTER);
         }
     }

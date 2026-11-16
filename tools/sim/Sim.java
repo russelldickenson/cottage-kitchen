@@ -13,10 +13,6 @@ public class Sim {
     static int madeByMove, madeByCascade, activated;
     static boolean counting;
     static boolean powerUpsOn = true;
-    static long harvestedTiles, harvestedValue;
-    static long levelCoins;
-    /** Tiles harvested per tile type during the last playLevel (counting only), for the farm simulation. */
-    static final long[] byType = new long[Art.COUNT];
     static final boolean NO_SPECIALS = Boolean.getBoolean("nospecials");
 
     static final class State {
@@ -75,25 +71,18 @@ public class Sim {
             clear = Rules.specialClearSet(b, a, t2);
             if (counting) activated++;
             counted.addAll(clear);
-            if (counting) levelCoins += Rules.specialCoins(clear.size(), combo);
         } else {
             List<Board.Run> runs = b.findRuns();
             if (runs.isEmpty()) {
                 b.swap(m[0], m[1], m[2], m[3]);
                 return -1;
             }
-            if (counting) for (Board.Run r : runs) levelCoins += Rules.runCoins(r.tiles.size(), combo);
             clear = fromRuns(runs, a, t2, counted, spT, spTy);
         }
         s.moves--;
         double gain = 0;
         while (true) {
             for (Tile t : counted) {
-                if (counting && t.type < Art.CROPS) {
-                    harvestedTiles++;
-                    byType[t.type]++;
-                    harvestedValue += Farm.BASE_PRICE[t.type];
-                }
                 if (t.type < Art.CROPS && s.need[t.type] > 0) {
                     s.need[t.type]--;
                     gain += 1;
@@ -107,7 +96,6 @@ public class Sim {
             List<Board.Run> runs = b.findRuns();
             if (runs.isEmpty()) break;
             combo++;
-            if (counting) for (Board.Run r : runs) levelCoins += Rules.runCoins(r.tiles.size(), combo);
             counted = new LinkedHashSet<>();
             spT = new ArrayList<>();
             spTy = new ArrayList<>();
@@ -131,49 +119,15 @@ public class Sim {
         return clear;
     }
 
-    /** skill: 1.0 always plays the best goal move, 0.0 plays a random legal move. Returns moves left, or -1 on a loss. */
+    /** Plays one level. Returns the moves left, or -1 on a loss. */
     static int playLevel(Level lv, double skill) {
-        return playLevel(lv, skill, null);
-    }
-
-    /** Moves left after the last playLevel (after any farming), and moves spent farming. */
-    static int lastMovesLeft, lastFarmMoves;
-
-    /**
-     * With a herd, spare moves after the goals keep farming whatever stock the herd is still short of (see GameView.startFarming).
-     * Returns the moves left when the goals were done (what the stars use), or -1 on a loss.
-     */
-    static int playLevel(Level lv, double skill, Farm.Herd herd) {
         powerUpsOn = lv.powerUps();
         Board b = new Board(COLS, ROWS, lv.kinds, rnd);
         State s = new State();
         for (int i = 0; i < lv.goalKinds.length; i++) s.need[lv.goalKinds[i]] = lv.goalCounts[i];
         s.moves = lv.moves;
         runMoves(b, s, lv, skill);
-        lastFarmMoves = 0;
-        if (!s.done()) {
-            lastMovesLeft = 0;
-            return -1;
-        }
-        int atGoal = s.moves;
-        if (herd != null && s.moves > 0) {
-            boolean any = false;
-            for (int k = 0; k < Farm.STOCKS; k++) {
-                int tile = Farm.STOCK_TILE[k], missing = herd.shortfall(k, (int) byType[tile]);
-                boolean onBoard = false;
-                for (int kind : lv.kinds) onBoard |= kind == tile;
-                if (missing > 0 && onBoard) {
-                    s.need[tile] = missing;
-                    any = true;
-                }
-            }
-            if (any) {
-                runMoves(b, s, lv, skill);
-                lastFarmMoves = atGoal - s.moves;
-            }
-        }
-        lastMovesLeft = s.moves;
-        return atGoal;
+        return s.done() ? s.moves : -1;
     }
 
     private static void runMoves(Board b, State s, Level lv, double skill) {
@@ -209,39 +163,6 @@ public class Sim {
     }
 
     public static void main(String[] args) {
-        if (args.length > 1 && args[1].equals("economy")) {
-            int games = Integer.parseInt(args[0]);
-            long cum = 0;
-            System.out.println("level moves | crops harvested | crop sale value | level coins | income per win | cumulative   (expert, base prices)");
-            for (int i = 0; i < Level.COUNT; i++) {
-                Level lv = Level.get(i);
-                harvestedTiles = harvestedValue = levelCoins = 0;
-                long movesLeftSum = 0;
-                int wins = 0;
-                for (int g = 0; g < games; g++) {
-                    int r = playLevel(lv, 1.0);
-                    if (r >= 0) {
-                        wins++;
-                        movesLeftSum += r;
-                    }
-                }
-                double crops = (double) harvestedTiles / games, sale = (double) harvestedValue / games;
-                double coins = (double) levelCoins / games + (wins == 0 ? 0 : (double) Rules.MOVE_BONUS * movesLeftSum / wins);
-                double income = sale + coins;
-                cum += Math.round(income);
-                System.out.printf("%5d %5d | %15.1f | %15.0f | %11.0f | %14.0f | %d%n", i + 1, lv.moves, crops, sale, coins, income, cum);
-            }
-            int houses = 0, dec = 0;
-            for (int sp = 0; sp < Farm.SPECIES; sp++) for (int l = 0; l < Farm.MAX_HOUSE_LEVEL; l++) houses += Farm.houseCost(sp, l);
-            for (int sp = 1; sp < Farm.SPECIES; sp++) houses += Farm.animalPrice(sp) * Farm.capacity(sp, Farm.MAX_HOUSE_LEVEL);
-            for (int cost : Farm.DECOR_COST) dec += cost;
-            System.out.println("Houses and animals cost " + houses + ", decorations " + dec + ", total " + (houses + dec) + " coins.");
-            return;
-        }
-        if (args.length > 1 && args[1].equals("farm")) {
-            FarmSim.run(Integer.parseInt(args[0]));
-            return;
-        }
         if (args.length > 1 && args[1].equals("stats")) {
             int games = Integer.parseInt(args[0]);
             System.out.println("level  moves  power-ups made by player move / by cascade / used   (per game, expert bot)");
@@ -272,12 +193,12 @@ public class Sim {
         }
         int n = args.length > 0 ? Integer.parseInt(args[0]) : 100;
         double[] skills = {1.0, 0.5, 0.0};
-        System.out.printf("%-5s %-26s %5s | %-22s | %-22s | %-22s%n", "level", "goals", "moves", "expert  win%  left", "casual  win%  left", "random  win%  left");
+        System.out.printf("%-5s %-34s %5s | %-22s | %-22s | %-22s%n", "level", "goals", "moves", "expert  win%  left", "casual  win%  left", "random  win%  left");
         for (int i = 0; i < Level.COUNT; i++) {
             Level lv = Level.get(i);
             StringBuilder goals = new StringBuilder();
             for (int j = 0; j < lv.goalKinds.length; j++) goals.append(lv.goalCounts[j]).append(j + 1 < lv.goalKinds.length ? "/" : "");
-            StringBuilder row = new StringBuilder(String.format("%-5d %-26s %5d |", lv.number, goals + " (" + lv.kinds.length + " crops)", lv.moves));
+            StringBuilder row = new StringBuilder(String.format("%-5d %-34s %5d |", lv.number, lv.recipe.name + " " + goals, lv.moves));
             for (double sk : skills) {
                 int wins = 0, left = 0;
                 for (int g = 0; g < n; g++) {

@@ -12,7 +12,6 @@ import android.view.MotionEvent;
 import android.view.View;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
@@ -20,9 +19,9 @@ import java.util.Set;
 
 /** Owns the game state, runs the match-3 state machine and handles touch input. Drawing is in Renderer. */
 public class GameView extends View {
-    enum Screen {TITLE, LEVELS, PLAY, FARM}
+    enum Screen {TITLE, BOOK, PLAY, RESULT}
 
-    enum Phase {IDLE, SWAP, SWAPBACK, CLEAR, FALL, BAG, TIP}
+    enum Phase {IDLE, SWAP, SWAPBACK, CLEAR, FALL, DONE, TIP}
 
     static final int COLS = Rules.COLS, ROWS = Rules.ROWS;
     private static final float SWAP_SPEED = 9f, GRAVITY = 45f, CLEAR_TIME = 0.28f;
@@ -32,16 +31,16 @@ public class GameView extends View {
         String text = "";
         int color = GREEN;
         boolean circle, locked, pressed, back, speaker, muted;
+        /** Level index when this is a card on the recipe book, else -1. */
+        int card = -1;
         /** Hit area only: the screen draws it itself. */
         boolean hidden;
-        int stars = -1;
         Runnable act;
     }
 
     final Gfx gfx = new Gfx();
     final Random rnd = new Random();
     final Effects fx = new Effects(rnd, gfx);
-    final FarmHub hub = new FarmHub(this);
     final Renderer renderer;
     final Progress progress;
     final Sfx sfx;
@@ -52,23 +51,18 @@ public class GameView extends View {
     Rules.Spawns spawns = new Rules.Spawns();
     Tile fxTile;
     float clearDuration = CLEAR_TIME;
-    float bagT, tipT;
-    /** Animal coins already paid out live this level, and how many animals of each species they covered. */
-    int livePaid;
-    int[] paidFed = new int[Farm.SPECIES];
+    float doneT, tipT;
     int pendingTip = -1, tipType;
-    int[] harvest = new int[Art.CROPS];
-    /** This level's payout, split up for the result banner on the farm screen. */
-    int saleCoins, animalCoins;
-    /** What the farm did when the last level ended (stock hauled in, animals fed). */
-    Farm.Report report = new Farm.Report();
 
     // layout
     float W, H, topInset, botInset, u;
-    float bx, by, cell, coinX, coinY, coinR;
-    /** The pasture under the board where the herd is shown during a level. */
-    final RectF farmStrip = new RectF(), bankRect = new RectF();
-    final RectF boardPanel = new RectF(), goalPanel = new RectF(), tipBox = new RectF(), confirmBox = new RectF();
+    float bx, by, cell;
+    /** The order card under the board: the dish and what it still needs. */
+    final RectF kitchen = new RectF();
+    final RectF boardPanel = new RectF(), tipBox = new RectF(), confirmBox = new RectF(), resultBox = new RectF();
+    /** One card per dish on the recipe book screen, which is also the level menu. */
+    final RectF[] bookCard = new RectF[Level.COUNT];
+    int bookPressed = -1;
 
     // play state
     Screen screen = Screen.TITLE;
@@ -77,13 +71,9 @@ public class GameView extends View {
     int levelIndex;
     Board board;
     int[] need = new int[Art.COUNT];
-    int movesLeft, coins, landed, combo, stars, bonus;
-    boolean won;
-    /** After the goals are done, spare moves can keep farming what the herd is short of. goalMoves is what was left when the goals finished. */
-    boolean farming;
-    int goalMoves;
-    Button bankBtn;
-    float dispCoins, idleTime, clearTimer, time;
+    int movesLeft, combo, stars;
+    boolean won, firstCook;
+    float idleTime, clearTimer, time;
     Tile selected, swapA, swapB, downTile;
     int[] hint;
     Button downButton;
@@ -97,6 +87,7 @@ public class GameView extends View {
         sfx = new Sfx(ctx);
         sfx.enabled = progress.soundOn;
         renderer = new Renderer(ctx, this, gfx, fx);
+        for (int i = 0; i < bookCard.length; i++) bookCard[i] = new RectF();
         setOnApplyWindowInsetsListener((v, insets) -> {
             topInset = insets.getSystemWindowInsetTop();
             botInset = insets.getSystemWindowInsetBottom();
@@ -124,7 +115,7 @@ public class GameView extends View {
         float m = 3 * u, hh = 13 * u;
         float hudTop = topInset + m;
         float top = hudTop + hh + m * 0.8f;
-        float pad = 2 * u, minStrip = 38 * u, maxStrip = 0.8f * (W - 2 * m);
+        float pad = 2 * u, minStrip = 36 * u, maxStrip = 44 * u;
         float bottom = H - botInset - m;
         float availH = bottom - top - minStrip - 3 * u;
         cell = Math.min((W - 2 * m - 2 * pad) / COLS, (availH - 2 * pad) / ROWS);
@@ -132,17 +123,12 @@ public class GameView extends View {
         bx = (W - bw) / 2;
         by = top + pad;
         boardPanel.set(bx - pad, by - pad, bx + bw + pad, by + bh + pad);
-        // the farm strip takes everything under the board: the level's goals along its top, the pasture below
+        // the order card takes everything under the board
         float stripTop = boardPanel.bottom + 3 * u;
-        farmStrip.set(m, stripTop, W - m, Math.min(bottom, stripTop + maxStrip));
-        goalPanel.set(farmStrip.left + u, farmStrip.top + u, farmStrip.right - u, farmStrip.top + 12 * u);
-        bankRect.set(goalPanel.right - 28 * u, goalPanel.top, goalPanel.right, goalPanel.bottom);
-        hub.layout();
+        kitchen.set(m, stripTop, W - m, Math.min(bottom, stripTop + maxStrip));
+        resultBox.set(W * 0.07f, topInset + m + hh + 8 * u, W * 0.93f, H - botInset - m - 13 * u - 4 * u);
         tipBox.set(W * 0.1f, H * 0.22f, W * 0.9f, H * 0.78f);
         confirmBox.set(W * 0.1f, H * 0.32f, W * 0.9f, H * 0.68f);
-        coinR = hh * 0.5f;
-        coinX = m + hh + m * 0.8f + hh * 0.6f;
-        coinY = hudTop + hh / 2;
     }
 
     void buildButtons() {
@@ -156,34 +142,29 @@ public class GameView extends View {
             });
             addWide(confirmBox.centerX(), confirmBox.top + ph * 0.79f, pw * 0.5f, bh, "QUIT", ORANGE, () -> {
                 confirmQuit = false;
-                goLevels();
+                goBook();
             });
         } else if (screen == Screen.TITLE) {
             addSpeaker(m, topInset + m, hh);
-            addWide(W / 2, H * 0.62f + 8.5f * u, W * 0.6f, 17 * u, "PLAY", GREEN, this::goLevels);
-            addWide(W / 2, H * 0.62f + 17 * u + 4 * u + 7.5f * u, W * 0.6f, 15 * u, "MY FARM", ORANGE, () -> goScreen(Screen.FARM));
-        } else if (screen == Screen.FARM) {
-            hub.build(screen);
-        } else if (screen == Screen.LEVELS) {
+            addWide(W / 2, H * 0.66f, W * 0.6f, 17 * u, "COOK", GREEN, this::goBook);
+        } else if (screen == Screen.RESULT) {
+            addBack(m, topInset + m, hh, this::goBook);
+            buildResultButtons();
+        } else if (screen == Screen.BOOK) {
             addBack(m, topInset + m, hh, this::goTitle);
             addSpeaker(W - m - hh, topInset + m, hh);
-            float areaTop = topInset + m + hh + 8 * u;
+            float areaTop = topInset + m + hh + 4 * u, gap = 2.5f * u;
             float areaH = H - botInset - m - areaTop;
-            float d = Math.min(W * 0.24f, areaH / 5f * 0.82f);
-            float gx = (W - 3 * d) / 4f, gy = (areaH - 5 * d) / 5f;
+            int rows = (Level.COUNT + 2) / 3;
+            float cw = (W - 2 * m - 2 * gap) / 3f, ch = Math.min(areaH / 5f, (areaH - (rows - 1) * gap) / rows);
             for (int i = 0; i < Level.COUNT; i++) {
                 final int idx = i;
-                Button b = new Button();
-                float x = gx + (i % 3) * (d + gx);
-                float y = areaTop + gy / 2 + (i / 3) * (d + gy);
-                b.r.set(x, y, x + d, y + d);
-                b.circle = true;
-                b.text = String.valueOf(i + 1);
-                b.locked = i >= progress.unlocked;
-                b.color = i == progress.unlocked - 1 ? ORANGE : GREEN;
-                b.stars = b.locked ? -1 : progress.bestStars[i];
-                if (!b.locked) b.act = () -> startLevel(idx);
-                buttons.add(b);
+                float x = m + (i % 3) * (cw + gap), y = areaTop + (i / 3) * (ch + gap);
+                bookCard[i].set(x, y, x + cw, y + ch);
+                if (i < progress.unlocked) {
+                    Button b = addHit(bookCard[i], () -> startLevel(idx));
+                    b.card = idx;
+                }
             }
         } else if (phase == Phase.TIP) {
             addWide(tipBox.centerX(), tipBox.top + tipBox.height() * 0.9f, tipBox.width() * 0.6f, tipBox.height() * 0.11f, "GOT IT!", GREEN, () -> {
@@ -194,10 +175,6 @@ public class GameView extends View {
             });
         } else {
             addBack(m, topInset + m, hh, this::askQuit);
-            bankBtn = null;
-            if (screen == Screen.PLAY && farming && phase != Phase.BAG) {
-                bankBtn = addWide(bankRect.centerX(), bankRect.centerY(), bankRect.width(), bankRect.height(), "FINISH", ORANGE, this::bankMoves);
-            }
         }
     }
 
@@ -259,15 +236,12 @@ public class GameView extends View {
             }
             return true;
         }
-        if (screen == Screen.LEVELS) {
+        if (screen == Screen.BOOK) {
             goTitle();
             return true;
         }
-        if (screen == Screen.FARM) {
-            if (hub.tipOpen) hub.dismissTip();
-            else if (hub.result && hub.tend) hub.setTend(false);
-            else if (hub.result) goLevels();
-            else goTitle();
+        if (screen == Screen.RESULT) {
+            goBook();
             return true;
         }
         return false;
@@ -275,11 +249,11 @@ public class GameView extends View {
 
     /** Back arrow / system back during a level: ask first, unless the level is already decided. */
     private void askQuit() {
-        if (screen == Screen.PLAY && phase != Phase.BAG) {
+        if (screen == Screen.PLAY && phase != Phase.DONE) {
             confirmQuit = true;
             buildButtons();
         } else {
-            goLevels();
+            goBook();
         }
     }
 
@@ -287,24 +261,28 @@ public class GameView extends View {
         sfx.release();
     }
 
-    /** Switches to a screen that has no board (farm or store). Coming from the menus starts the farm fresh. */
-    void goScreen(Screen s) {
-        boolean fromMenu = screen == Screen.TITLE || screen == Screen.LEVELS;
-        screen = s;
+    /** The result of the level that just ended: the finished dish, or what was still missing. */
+    private void goResult() {
+        screen = Screen.RESULT;
         phase = Phase.IDLE;
-        confirmQuit = false;
-        if (fromMenu) hub.open();
-        else hub.layout();
         buildButtons();
     }
 
-    /** The farm after a level, showing the result and what to spend the coins on. */
-    private void goResult() {
-        screen = Screen.FARM;
-        phase = Phase.IDLE;
-        hub.showResult();
-        dispCoins = Math.max(0, progress.totalCoins - coins);
-        buildButtons();
+    private void buildResultButtons() {
+        float m = 3 * u, gap = 2.5f * u, h = 13 * u;
+        float total = W - 2 * m, cy = H - botInset - m - h / 2;
+        if (won) {
+            boolean hasNext = levelIndex + 1 < Level.COUNT;
+            float usable = total - 2 * gap, wR = usable * 0.30f, wN = usable * 0.40f, wM = usable * 0.30f;
+            addWide(m + wR / 2, cy, wR, h, "REPLAY", ORANGE, () -> startLevel(levelIndex));
+            addWide(m + wR + gap + wN / 2, cy, wN, h, hasNext ? "NEXT" : "DONE", GREEN,
+                    hasNext ? () -> startLevel(levelIndex + 1) : this::goBook);
+            addWide(W - m - wM / 2, cy, wM, h, "BOOK", BLUE, this::goBook);
+        } else {
+            float usable = total - gap, wT = usable * 0.6f, wM = usable * 0.4f;
+            addWide(m + wT / 2, cy, wT, h, "TRY AGAIN", GREEN, () -> startLevel(levelIndex));
+            addWide(W - m - wM / 2, cy, wM, h, "BOOK", BLUE, this::goBook);
+        }
     }
 
     void goTitle() {
@@ -312,9 +290,9 @@ public class GameView extends View {
         buildButtons();
     }
 
-    void goLevels() {
+    void goBook() {
         confirmQuit = false;
-        screen = Screen.LEVELS;
+        screen = Screen.BOOK;
         phase = Phase.IDLE;
         buildButtons();
     }
@@ -322,25 +300,18 @@ public class GameView extends View {
     void startLevel(int idx) {
         levelIndex = idx;
         confirmQuit = false;
-        level = Level.get(idx, progress.herd);
-        farming = false;
+        level = Level.get(idx);
         board = new Board(COLS, ROWS, level.kinds, rnd);
         need = new int[Art.COUNT];
         for (int i = 0; i < level.goalKinds.length; i++) need[level.goalKinds[i]] = level.goalCounts[i];
         movesLeft = level.moves;
-        coins = 0;
-        landed = 0;
-        dispCoins = 0;
         combo = 0;
         selected = null;
         hint = null;
         fx.clear();
-        renderer.farm.resetStripEvents();
+        renderer.cook.clear();
         dying.clear();
         pendingTip = -1;
-        harvest = new int[Art.CROPS];
-        livePaid = 0;
-        paidFed = new int[Farm.SPECIES];
         for (int r = 0; r < ROWS; r++) {
             for (int c = 0; c < COLS; c++) board.g[r][c].y = r - ROWS - rnd.nextFloat() * 1.5f - (COLS - c) * 0.1f;
         }
@@ -354,17 +325,13 @@ public class GameView extends View {
 
     private void update(float dt) {
         time += dt;
-        float target = screen == Screen.PLAY ? landed : progress.totalCoins;
-        if (Math.abs(target - dispCoins) < 1) dispCoins = target;
-        else dispCoins += (target - dispCoins) * Math.min(1f, dt * 9f) + Math.signum(target - dispCoins) * dt * 20;
-
         fx.update(dt, u);
-        renderer.farm.update(dt);
-        int coinsIn = fx.takeLanded();
-        landed += coinsIn;
-        if (coinsIn > 0) sfx.coin();
-        if (screen == Screen.PLAY && board != null && phase != Phase.BAG) payFedAnimals();
-        for (Button b : buttons) if (b != downButton) b.pressed = false;
+        if (renderer.cook.update(dt) > 0) sfx.coin();
+        bookPressed = -1;
+        for (Button b : buttons) {
+            if (b != downButton) b.pressed = false;
+            else if (b.pressed && b.card >= 0) bookPressed = b.card;
+        }
         if (screen != Screen.PLAY || confirmQuit) return;
 
         for (int r = 0; r < ROWS; r++) {
@@ -431,13 +398,13 @@ public class GameView extends View {
                     }
                 }
                 break;
-            case BAG:
-                // the level's last coins (the market, the streak bonus) fly in, then the farm shows the result
-                bagT += dt;
-                if (bagT > 0.9f && fx.flyers.isEmpty()) {
-                    sfx.win();
-                    goResult();
+            case DONE:
+                // the dish is ready: a moment to enjoy it, then the result
+                doneT += dt;
+                if (((int) (doneT * 14)) != ((int) ((doneT - dt) * 14))) {
+                    fx.sparkle(kitchen.left + kitchen.width() * 0.2f + rnd.nextFloat() * kitchen.width() * 0.6f, kitchen.centerY() + (rnd.nextFloat() - 0.5f) * kitchen.height() * 0.6f, u, cell);
                 }
+                if (doneT > 1.5f) goResult();
                 break;
             case TIP:
                 tipT += dt;
@@ -497,9 +464,10 @@ public class GameView extends View {
             for (int i = 0; i < n; i++) {
                 Tile t = run.tiles.get(i);
                 if (seen.add(t)) {
-                    harvest[t.type]++;
-                    renderer.farm.launch(t.type, cx(t), cy(t), rnd.nextFloat() * 0.12f);
-                    if (need[t.type] > 0) need[t.type]--;
+                    if (need[t.type] > 0) {
+                        need[t.type]--;
+                        renderer.cook.launch(t.type, cx(t), cy(t), rnd.nextFloat() * 0.12f);
+                    }
                     if (!spawns.tiles.contains(t)) {
                         t.dying = true;
                         t.dyDelay = 0;
@@ -543,9 +511,10 @@ public class GameView extends View {
             t.dying = true;
             dying.add(t);
             if (t.type < Art.CROPS) {
-                harvest[t.type]++;
-                renderer.farm.launch(t.type, cx(t), cy(t), d);
-                if (need[t.type] > 0) need[t.type]--;
+                if (need[t.type] > 0) {
+                    need[t.type]--;
+                    renderer.cook.launch(t.type, cx(t), cy(t), d);
+                }
             }
             maxDelay = Math.max(maxDelay, d);
         }
@@ -576,18 +545,9 @@ public class GameView extends View {
     }
 
     private void afterSettle() {
-        if (farming) {
-            // spare moves farm until the herd's shortfall is cleared or the moves run out; unused moves are banked
-            if (Rules.goalsDone(need) || movesLeft <= 0) endLevel(true);
-            else keepPlaying();
-        } else if (Rules.goalsDone(need)) {
-            if (movesLeft > 0 && startFarming()) keepPlaying();
-            else endLevel(true);
-        } else if (movesLeft <= 0) {
-            endLevel(false);
-        } else {
-            keepPlaying();
-        }
+        if (Rules.goalsDone(need)) endLevel(true);
+        else if (movesLeft <= 0) endLevel(false);
+        else keepPlaying();
     }
 
     private void keepPlaying() {
@@ -609,83 +569,19 @@ public class GameView extends View {
         }
     }
 
-    /**
-     * The goals are done with moves to spare: if the herd is still short of something that is on the board, the level
-     * carries on with that as the only goal. Returns false when there is nothing worth farming.
-     */
-    private boolean startFarming() {
-        Farm.Herd hd = progress.herd;
-        int[] kinds = new int[Farm.STOCKS], counts = new int[Farm.STOCKS];
-        int n = 0;
-        for (int s = 0; s < Farm.STOCKS; s++) {
-            int tile = Farm.STOCK_TILE[s], short_ = hd.shortfall(s, harvest[tile]);
-            boolean onBoard = false;
-            for (int k : level.kinds) onBoard |= k == tile;
-            if (short_ > 0 && onBoard) {
-                kinds[n] = tile;
-                counts[n++] = short_;
-            }
-        }
-        if (n == 0) return false;
-        farming = true;
-        goalMoves = movesLeft;
-        level = new Level(level.number, level.kinds, Arrays.copyOf(kinds, n), Arrays.copyOf(counts, n), level.moves);
-        need = new int[Art.COUNT];
-        for (int i = 0; i < n; i++) need[kinds[i]] = counts[i];
-        sfx.powerUpMade();
-        addPop("Goals done!", W / 2, by + cell * 1.8f, cell * 0.9f, 1.4f, 0xFFFFD43B);
-        addPop("Farm for the herd", W / 2, by + cell * 3.2f, cell * 0.75f, 1.4f, 0xFF9BE15D);
-        buildButtons();
-        return true;
-    }
-
-    /** Stops farming for the herd and ends the level; the unused moves count toward the stars. */
-    private void bankMoves() {
-        if (!farming || phase != Phase.IDLE) return;
-        endLevel(true);
-    }
-
-    /**
-     * An animal is paid the moment the stock on hand plus this level's harvest first covers its feed: its coin flies from
-     * its house to the counter. Whatever is not paid live (the market, the streak bonus) flies in when the level ends.
-     */
-    private void payFedAnimals() {
-        int[] fed = progress.herd.provisionalFed(harvest);
-        for (int sp = 0; sp < Farm.SPECIES; sp++) {
-            int n = fed[sp] - paidFed[sp];
-            if (n <= 0) continue;
-            paidFed[sp] = fed[sp];
-            float[] at = renderer.farm.houseSpot(sp);
-            for (int i = 0; i < n; i++) {
-                coins += Farm.COINS[sp];
-                livePaid += Farm.COINS[sp];
-                fx.coin(at[0], at[1], 0.55f + 0.1f * i, Farm.COINS[sp]);
-            }
-            addPop("+" + n * Farm.COINS[sp], at[0], at[1] - 0.12f * W, cell * 0.6f, 1.0f, 0xFFFFD43B);
-        }
-    }
-
     private void endLevel(boolean win) {
         won = win;
-        if (!win) sfx.lose();
-        stars = 0;
+        stars = win ? Rules.stars(movesLeft, level.moves) : 0;
+        firstCook = win && progress.bestStars[levelIndex] == 0;
+        progress.levelFinished(levelIndex, stars);
         if (win) {
-            stars = Rules.stars(farming ? goalMoves : movesLeft, level.moves);
-        }
-        saleCoins = Farm.saleValue(harvest);
-        report = progress.farmRound(harvest);
-        animalCoins = report.coins;
-        int rest = Math.max(0, saleCoins + animalCoins - livePaid);
-        coins = livePaid + rest;
-        progress.levelFinished(levelIndex, stars, coins);
-        if (win) {
-            phase = Phase.BAG;
-            bagT = 0;
-            float sx = farmStrip.centerX(), sy = farmStrip.centerY();
-            int n = Math.min(10, Math.max(1, rest / 40));
-            for (int i = 0; i < n; i++) fx.coin(sx, sy, i * 0.06f, i == n - 1 ? rest - (rest / n) * (n - 1) : rest / n);
+            sfx.win();
+            phase = Phase.DONE;
+            doneT = 0;
+            addPop(level.recipe.name + " is ready!", W / 2, by + cell * 3f, cell * 0.8f, 1.4f, 0xFFFFD43B);
             buildButtons();
         } else {
+            sfx.lose();
             goResult();
         }
     }

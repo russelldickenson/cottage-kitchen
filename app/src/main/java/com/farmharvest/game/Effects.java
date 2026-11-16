@@ -6,17 +6,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-/** Short-lived visual effects: sparkles, coins flying to the counter or the bag, and floating text. */
+/** Short-lived visual effects: sparkles and floating text. */
 final class Effects {
     static final class Particle {
         float x, y, vx, vy, life, max, size;
         int color;
-    }
-
-    /** A coin on its way somewhere. Start position is only used for coins heading to the counter. */
-    static final class Flyer {
-        float sx, sy, delay, t;
-        int value;
     }
 
     static final class Pop {
@@ -25,16 +19,9 @@ final class Effects {
         int color;
     }
 
-    private static final float COUNTER_FLIGHT = 0.65f, BAG_FLIGHT = 0.5f;
-
     final List<Particle> particles = new ArrayList<>();
-    final List<Flyer> flyers = new ArrayList<>();
-    final List<Flyer> bagFlyers = new ArrayList<>();
     final List<Pop> pops = new ArrayList<>();
-    /** Counter / bag "bounce" strength, 1 right after a coin lands. */
-    float bump, bagBump;
 
-    private int landed, bagLanded;
     private final Random rnd;
     private final Gfx gfx;
 
@@ -45,14 +32,10 @@ final class Effects {
 
     void clear() {
         particles.clear();
-        flyers.clear();
-        bagFlyers.clear();
         pops.clear();
     }
 
     void update(float dt, float u) {
-        bump = Math.max(0, bump - dt * 4);
-        bagBump = Math.max(0, bagBump - dt * 5);
         for (int i = particles.size() - 1; i >= 0; i--) {
             Particle p = particles.get(i);
             p.life -= dt;
@@ -67,62 +50,6 @@ final class Effects {
             p.y -= 8 * u * dt;
             if (p.life <= 0) pops.remove(i);
         }
-        for (int i = flyers.size() - 1; i >= 0; i--) {
-            Flyer f = flyers.get(i);
-            if (f.delay > 0) {
-                f.delay -= dt;
-                continue;
-            }
-            f.t += dt / COUNTER_FLIGHT;
-            if (f.t >= 1) {
-                landed += f.value;
-                bump = 1;
-                flyers.remove(i);
-            }
-        }
-        for (int i = bagFlyers.size() - 1; i >= 0; i--) {
-            Flyer f = bagFlyers.get(i);
-            if (f.delay > 0) {
-                f.delay -= dt;
-                continue;
-            }
-            f.t += dt / BAG_FLIGHT;
-            if (f.t >= 1) {
-                bagLanded += f.value;
-                bagBump = 1;
-                bagFlyers.remove(i);
-            }
-        }
-    }
-
-    /** Coins that reached the counter since the last call. */
-    int takeLanded() {
-        int v = landed;
-        landed = 0;
-        return v;
-    }
-
-    /** Coins that reached the bag since the last call. */
-    int takeBagLanded() {
-        int v = bagLanded;
-        bagLanded = 0;
-        return v;
-    }
-
-    void coin(float fromX, float fromY, float delay, int value) {
-        Flyer f = new Flyer();
-        f.sx = fromX;
-        f.sy = fromY;
-        f.delay = delay;
-        f.value = value;
-        flyers.add(f);
-    }
-
-    void bagCoin(float delay, int value) {
-        Flyer f = new Flyer();
-        f.delay = delay;
-        f.value = value;
-        bagFlyers.add(f);
     }
 
     void sparkle(float x, float y, float u, float cell) {
