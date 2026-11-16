@@ -9,8 +9,10 @@ import android.graphics.Typeface;
 
 /** Cartoon drawing helpers: outlined text, chunky panels, coins, stars. */
 final class Gfx {
-    static final int GREEN = 0xFF5BC236, ORANGE = 0xFFFF9B26, BLUE = 0xFF3FA9F5, PANEL = 0xFF6B3F17;
+    static final int GREEN = 0xFF75C260, ORANGE = 0xFFFF9B26, BLUE = 0xFF3FA9F5, PANEL = 0xFF6B3F17;
     static final int CREAM = 0xFFFFF4D2, WOOD = 0xFF8B5A2B;
+    /** The tick and finished-bar green: a touch deeper than GREEN so it reads on cream. */
+    static final int CHECK_GREEN = 0xFF68BB57;
     static final int GOLD = 0xFFFFC928;
     static final int GOLD_DARK = 0xFFC97700;
     static final int INK = 0xFF5A3410;
@@ -119,8 +121,8 @@ final class Gfx {
     }
 
     void check(Canvas c, float cx, float cy, float r) {
-        circle(c, cx, cy, r, 0xFF4CBB2C);
-        circleLine(c, cx, cy, r, r * 0.16f, 0xFF2C7F14);
+        circle(c, cx, cy, r, CHECK_GREEN);
+        circleLine(c, cx, cy, r, r * 0.16f, 0xFF417F34);
         line.setColor(Color.WHITE);
         line.setStrokeWidth(r * 0.24f);
         path.reset();
@@ -191,6 +193,38 @@ final class Gfx {
             line.setStrokeWidth(lineW);
             c.drawPath(path, line);
         }
+    }
+
+    /** A bold arrow pointing right, white with a dark outline. */
+    void nextArrow(Canvas c, float cx, float cy, float s, int outline) {
+        for (int pass = 0; pass < 2; pass++) {
+            line.setColor(pass == 0 ? outline : Color.WHITE);
+            line.setStrokeWidth(pass == 0 ? s * 0.36f : s * 0.2f);
+            path.reset();
+            path.moveTo(cx - 0.4f * s, cy);
+            path.lineTo(cx + 0.38f * s, cy);
+            path.moveTo(cx + 0.02f * s, cy - 0.36f * s);
+            path.lineTo(cx + 0.4f * s, cy);
+            path.lineTo(cx + 0.02f * s, cy + 0.36f * s);
+            c.drawPath(path, line);
+        }
+    }
+
+    /** A circular arrow (replay), white with a dark outline, turning clockwise with a gap on the right. */
+    void replayArrow(Canvas c, float cx, float cy, float s, int outline) {
+        float r = 0.33f * s, start = 38f, sweep = 278f;
+        rf.set(cx - r, cy - r, cx + r, cy + r);
+        for (int pass = 0; pass < 2; pass++) {
+            line.setColor(pass == 0 ? outline : Color.WHITE);
+            line.setStrokeWidth(pass == 0 ? s * 0.3f : s * 0.15f);
+            c.drawArc(rf, start, sweep, false, line);
+        }
+        // arrowhead at the end of the arc, pointing along it
+        double a = Math.toRadians(start + sweep);
+        float ex = cx + r * (float) Math.cos(a), ey = cy + r * (float) Math.sin(a);
+        float tx = -(float) Math.sin(a), ty = (float) Math.cos(a), nx = (float) Math.cos(a), ny = (float) Math.sin(a);
+        polygon(c, Color.WHITE, outline, s * 0.09f,
+                ex + tx * 0.34f * s, ey + ty * 0.34f * s, ex + nx * 0.27f * s, ey + ny * 0.27f * s, ex - nx * 0.27f * s, ey - ny * 0.27f * s);
     }
 
     /** A chef's hat: three puffs over a band, outlined like the artwork. */

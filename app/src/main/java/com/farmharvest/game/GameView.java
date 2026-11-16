@@ -21,6 +21,8 @@ import java.util.Set;
 public class GameView extends View {
     enum Screen {TITLE, BOOK, PLAY, RESULT}
 
+    static final int ICON_NONE = 0, ICON_CHEF = 1, ICON_NEXT = 2, ICON_REPLAY = 3;
+
     enum Phase {IDLE, SWAP, SWAPBACK, CLEAR, FALL, DONE, TIP}
 
     static final int COLS = Rules.COLS, ROWS = Rules.ROWS;
@@ -30,7 +32,9 @@ public class GameView extends View {
         final RectF r = new RectF();
         String text = "";
         int color = GREEN;
-        boolean circle, locked, pressed, back, speaker, muted, chef;
+        boolean circle, locked, pressed, back, speaker, muted;
+        /** A small picture beside the label: one of the ICON_ values. */
+        int icon;
         /** Level index when this is a card on the recipe book, else -1. */
         int card = -1;
         /** Hit area only: the screen draws it itself. */
@@ -148,7 +152,7 @@ public class GameView extends View {
             });
         } else if (screen == Screen.TITLE) {
             addSpeaker(m, topInset + m, hh);
-            addWide(W / 2, H * 0.66f, W * 0.6f, 17 * u, "COOK", GREEN, this::goBook).chef = true;
+            addWide(W / 2, H * 0.66f, W * 0.6f, 17 * u, "COOK", GREEN, this::goBook).icon = ICON_CHEF;
         } else if (screen == Screen.RESULT) {
             addBack(m, topInset + m, hh, this::goBook);
             buildResultButtons();
@@ -275,14 +279,15 @@ public class GameView extends View {
         float total = W - 2 * m, cy = H - botInset - m - h / 2;
         if (won) {
             boolean hasNext = levelIndex + 1 < Level.COUNT;
-            float usable = total - 2 * gap, wR = usable * 0.30f, wN = usable * 0.40f, wM = usable * 0.30f;
-            addWide(m + wR / 2, cy, wR, h, "REPLAY", ORANGE, () -> startLevel(levelIndex));
-            addWide(m + wR + gap + wN / 2, cy, wN, h, hasNext ? "NEXT" : "DONE", GREEN,
+            float usable = total - 2 * gap, wR = usable * 0.36f, wN = usable * 0.34f, wM = usable * 0.30f;
+            addWide(m + wR / 2, cy, wR, h, "REPLAY", ORANGE, () -> startLevel(levelIndex)).icon = ICON_REPLAY;
+            Button next = addWide(m + wR + gap + wN / 2, cy, wN, h, hasNext ? "NEXT" : "DONE", GREEN,
                     hasNext ? () -> startLevel(levelIndex + 1) : this::goBook);
+            if (hasNext) next.icon = ICON_NEXT;
             addWide(W - m - wM / 2, cy, wM, h, "BOOK", BLUE, this::goBook);
         } else {
             float usable = total - gap, wT = usable * 0.6f, wM = usable * 0.4f;
-            addWide(m + wT / 2, cy, wT, h, "TRY AGAIN", GREEN, () -> startLevel(levelIndex));
+            addWide(m + wT / 2, cy, wT, h, "TRY AGAIN", GREEN, () -> startLevel(levelIndex)).icon = ICON_REPLAY;
             addWide(W - m - wM / 2, cy, wM, h, "BOOK", BLUE, this::goBook);
         }
     }

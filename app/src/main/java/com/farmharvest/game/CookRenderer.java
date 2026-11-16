@@ -158,11 +158,11 @@ final class CookRenderer {
             gfx.rrect(c, bl, cy - bh / 2, br, cy + bh / 2, bh / 2, 0xFFE3CE9B);
             if (now) {
                 int goal = lv.goalCounts[0], got = goal - v.need[kind];
-                if (got > 0) gfx.rrect(c, bl, cy - bh / 2, bl + Math.max(bh, (br - bl) * got / goal), cy + bh / 2, bh / 2, got >= goal ? 0xFF4CBB2C : 0xFFFFB02E);
+                if (got > 0) gfx.rrect(c, bl, cy - bh / 2, bl + Math.max(bh, (br - bl) * got / goal), cy + bh / 2, bh / 2, got >= goal ? Gfx.CHECK_GREEN : 0xFFFFB02E);
                 // the count lives in the pill at the top; the card only shows the bar and a tick when it is full
                 if (got >= goal) gfx.check(c, rowsRight - 4.5f * v.u, cy, rowH * 0.32f);
             } else if (done) {
-                gfx.rrect(c, bl, cy - bh / 2, br, cy + bh / 2, bh / 2, 0xFF4CBB2C);
+                gfx.rrect(c, bl, cy - bh / 2, br, cy + bh / 2, bh / 2, Gfx.CHECK_GREEN);
                 gfx.check(c, rowsRight - 4.5f * v.u, cy, rowH * 0.32f);
             } else {
                 gfx.textC(c, "Next", rowsRight, cy, rowH * 0.4f, 0xFFB09A6C, 0, Paint.Align.RIGHT);
@@ -233,7 +233,7 @@ final class CookRenderer {
         gfx.rrect(c, o.left, o.top + 1.5f * v.u, o.right, o.bottom + 1.5f * v.u, 6 * v.u, Gfx.darken(WOOD, 0.6f));
         gfx.rrect(c, o.left, o.top, o.right, o.bottom, 6 * v.u, WOOD);
         gfx.rrect(c, o.left + v.u, o.top + v.u, o.right - v.u, o.bottom - v.u, 5 * v.u, CREAM);
-        gfx.rrect(c, o.left - v.u, o.top - 3 * v.u, o.right + v.u, o.top + ph * 0.12f, 5 * v.u, v.won ? 0xFF5BC236 : 0xFFFF7A66);
+        gfx.rrect(c, o.left - v.u, o.top - 3 * v.u, o.right + v.u, o.top + ph * 0.12f, 5 * v.u, v.won ? Gfx.GREEN : 0xFFFF7A66);
         String title = !v.won ? "Out of moves" : lv.lastStep() ? "Order up!" : Recipes.INGREDIENT[lv.ingredient()] + " collected!";
         gfx.textC(c, title, o.centerX(), o.top + ph * 0.04f, fitSize(title, 7.5f * v.u, pw - 8 * v.u), Color.WHITE, v.won ? 0xFF1F5F10 : 0xFF8A2A1A, Paint.Align.CENTER);
 

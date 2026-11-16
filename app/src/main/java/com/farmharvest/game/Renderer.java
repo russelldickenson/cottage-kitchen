@@ -413,11 +413,15 @@ final class Renderer {
         else {
             float size = h * 0.42f;
             int outline = Gfx.darken(base, 0.4f);
-            if (b.chef) {
-                // a chef's hat beside the label
-                float tw = gfx.width(b.text, size), icon = h * 0.62f, gap = h * 0.18f, x0 = cx - (icon + gap + tw) / 2;
-                gfx.chefHat(c, x0 + icon / 2, cy + off - h * 0.06f, icon);
-                gfx.textC(c, b.text, x0 + icon + gap, cy + off, size, Color.WHITE, outline, Paint.Align.LEFT);
+            if (b.icon != GameView.ICON_NONE) {
+                // a small picture beside the label: before it, or after it for the forward arrow
+                float tw = gfx.width(b.text, size), icon = (b.icon == GameView.ICON_CHEF ? 0.62f : b.icon == GameView.ICON_REPLAY ? 0.6f : 0.5f) * h, gap = h * 0.18f;
+                float x0 = cx - (icon + gap + tw) / 2, textX = b.icon == GameView.ICON_NEXT ? x0 : x0 + icon + gap;
+                float iconX = b.icon == GameView.ICON_NEXT ? x0 + tw + gap + icon / 2 : x0 + icon / 2;
+                if (b.icon == GameView.ICON_CHEF) gfx.chefHat(c, iconX, cy + off - h * 0.06f, icon);
+                else if (b.icon == GameView.ICON_NEXT) gfx.nextArrow(c, iconX, cy + off, icon, outline);
+                else gfx.replayArrow(c, iconX, cy + off, icon, outline);
+                gfx.textC(c, b.text, textX, cy + off, size, Color.WHITE, outline, Paint.Align.LEFT);
             } else {
                 gfx.textC(c, b.text, cx, cy + off, size, Color.WHITE, outline, Paint.Align.CENTER);
             }
