@@ -10,12 +10,15 @@ final class Level {
     /** Power-up tiles (Golden Egg, Tractor, TNT, Scarecrow) only appear from this level number. */
     static final int POWER_UP_LEVEL = 12;
 
+    /** From this level number, the later ingredients of a dish also ask for one earlier ingredient of the same dish. */
+    static final int MULTI_LEVEL = 16;
+
     /** Move budgets, produced by tools/sim/run.sh (tune) from how fast an expert bot collects each order. */
     private static final int[] MOVES = {
             11, 11, 11, 12, 12, 11, 12, 12, 12, 12, 12, 11, 11, 12, 12,
-            13, 12, 12, 12, 13, 13, 13, 14, 13, 14, 14, 14, 15, 15, 15,
-            15, 16, 15, 17, 15, 17, 16, 18, 17, 17, 18, 17, 19, 17, 18,
-            18, 18, 18, 19};
+            13, 13, 16, 13, 14, 14, 14, 15, 15, 15, 15, 15, 16, 17, 15,
+            17, 17, 17, 16, 18, 18, 18, 16, 18, 18, 18, 17, 19, 18, 18,
+            18, 19, 19, 19};
 
     /** Position in the book, then the ingredient within the dish. */
     final int number, dish, step;
@@ -25,14 +28,14 @@ final class Level {
     final int[] goalCounts;
     final int moves;
 
-    Level(int number, int dish, int step, int[] kinds, int goalKind, int goalCount, int moves) {
+    Level(int number, int dish, int step, int[] kinds, int[] goalKinds, int[] goalCounts, int moves) {
         this.number = number;
         this.dish = dish;
         this.step = step;
         this.recipe = Recipes.ALL[dish];
         this.kinds = kinds;
-        this.goalKinds = new int[]{goalKind};
-        this.goalCounts = new int[]{goalCount};
+        this.goalKinds = goalKinds;
+        this.goalCounts = goalCounts;
         this.moves = moves;
     }
 
@@ -40,8 +43,13 @@ final class Level {
         return number >= POWER_UP_LEVEL;
     }
 
+    /** The ingredient this level is named for; any further goals are earlier ingredients of the same dish. */
     int ingredient() {
         return goalKinds[0];
+    }
+
+    boolean multi() {
+        return goalKinds.length > 1;
     }
 
     boolean lastStep() {
@@ -49,7 +57,9 @@ final class Level {
     }
 
     int totalNeeded() {
-        return goalCounts[0];
+        int n = 0;
+        for (int g : goalCounts) n += g;
+        return n;
     }
 
     /** How many of the ingredient to collect: it grows steadily through the book. */
@@ -75,6 +85,12 @@ final class Level {
             if (!used) kinds[k++] = filler;
             filler = (filler + 1) % Art.CROPS;
         }
-        return new Level(index + 1, dish, step, kinds, rc.ingredients[step], count, moves);
+        if (index + 1 >= MULTI_LEVEL && step > 0) {
+            // the main ingredient as usual, plus 70% as much of an earlier one (varied by level)
+            int extra = rc.ingredients[index % step];
+            return new Level(index + 1, dish, step, kinds, new int[]{rc.ingredients[step], extra},
+                    new int[]{count, Math.round(count * 0.7f)}, moves);
+        }
+        return new Level(index + 1, dish, step, kinds, new int[]{rc.ingredients[step]}, new int[]{count}, moves);
     }
 }

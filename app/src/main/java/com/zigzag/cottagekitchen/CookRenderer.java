@@ -115,7 +115,15 @@ final class CookRenderer {
     /** Where the ingredient being collected sits on the order card. */
     private float[] iconAt(int type) {
         layoutCard(v.kitchen);
-        return new float[]{rowsLeft + rowH * 0.5f, rowsTop + rowH * (v.level.step + 0.5f), rowH};
+        int row = v.level.step;
+        for (int j = 0; j < v.level.recipe.ingredients.length; j++) if (v.level.recipe.ingredients[j] == type) row = j;
+        return new float[]{rowsLeft + rowH * 0.5f, rowsTop + rowH * (row + 0.5f), rowH};
+    }
+
+    /** Which of the level's goals is this ingredient, or -1. */
+    private static int goalIndex(Level lv, int kind) {
+        for (int i = 0; i < lv.goalKinds.length; i++) if (lv.goalKinds[i] == kind) return i;
+        return -1;
     }
 
     /** How much of the whole dish is done: the ingredients already collected, plus this level's progress. */
@@ -145,7 +153,8 @@ final class CookRenderer {
         gfx.text(c, lv.recipe.name, rowsLeft, titleY + 1.6f * v.u, fitSize(lv.recipe.name, 5.2f * v.u, rowsRight - rowsLeft), 0xFF6B3F17, 0, Paint.Align.LEFT);
         for (int j = 0; j < lv.recipe.ingredients.length; j++) {
             int kind = lv.recipe.ingredients[j];
-            boolean now = j == lv.step, done = !now && v.progress.ingredientDone(lv.dish, j);
+            int gi = goalIndex(lv, kind);
+            boolean now = gi >= 0, done = !now && v.progress.ingredientDone(lv.dish, j);
             float cy = rowsTop + rowH * (j + 0.5f);
             if (now) {
                 // the ingredient this level is about stands out from the rest
@@ -157,7 +166,7 @@ final class CookRenderer {
             float bl = rowsLeft + rowH * 1.15f, br = rowsRight - 11 * v.u, bh = rowH * 0.34f;
             gfx.rrect(c, bl, cy - bh / 2, br, cy + bh / 2, bh / 2, 0xFFE3CE9B);
             if (now) {
-                int goal = lv.goalCounts[0], got = goal - v.need[kind];
+                int goal = lv.goalCounts[gi], got = goal - v.need[kind];
                 if (got > 0) gfx.rrect(c, bl, cy - bh / 2, bl + Math.max(bh, (br - bl) * got / goal), cy + bh / 2, bh / 2, got >= goal ? Gfx.CHECK_GREEN : 0xFFFFB02E);
                 // the count lives in the pill at the top; the card only shows the bar and a tick when it is full
                 if (got >= goal) gfx.check(c, rowsRight - 4.5f * v.u, cy, rowH * 0.32f);
@@ -271,8 +280,16 @@ final class CookRenderer {
                 else gfx.textC(c, "Next", x, y + isz * 0.7f, isz * 0.38f, 0xFFB09A6C, 0, Paint.Align.CENTER);
             }
         } else {
-            r.drawIcon(c, lv.ingredient(), o.centerX(), y - isz * 0.15f, isz * 1.3f);
-            gfx.textC(c, "x" + v.need[lv.ingredient()], o.centerX(), y + isz * 0.8f, isz * 0.5f, 0xFFD2452B, 0, Paint.Align.CENTER);
+            // every goal that fell short
+            int missing = 0;
+            for (int k : lv.goalKinds) if (v.need[k] > 0) missing++;
+            int slot2 = 0;
+            for (int k : lv.goalKinds) {
+                if (v.need[k] <= 0) continue;
+                float x = o.centerX() + (slot2++ - (missing - 1) / 2f) * isz * 2.2f;
+                r.drawIcon(c, k, x, y - isz * 0.15f, isz * 1.3f);
+                gfx.textC(c, "x" + v.need[k], x, y + isz * 0.8f, isz * 0.5f, 0xFFD2452B, 0, Paint.Align.CENTER);
+            }
         }
         r.drawButtons(c);
     }

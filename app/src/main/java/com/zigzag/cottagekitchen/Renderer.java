@@ -86,6 +86,11 @@ final class Renderer {
 
     /** A wooden pill with a short label and, when icon is a tile type, its picture at the left. */
     void drawPill(Canvas c, float l, float t, float r, float b, String text, int icon) {
+        drawPill(c, l, t, r, b, text, icon, false);
+    }
+
+    /** compact trims the padding after the text, for a row of several pills. */
+    void drawPill(Canvas c, float l, float t, float r, float b, String text, int icon, boolean compact) {
         float h = b - t;
         gfx.rrect(c, l, t + h * 0.07f, r, b + h * 0.07f, h / 2, Gfx.darken(PANEL, 0.6f));
         gfx.rrect(c, l, t, r, b, h / 2, PANEL);
@@ -95,7 +100,7 @@ final class Renderer {
             drawIcon(c, icon, l + h * 0.62f, (t + b) / 2, h * 0.9f);
             left = l + h * 0.75f;
         }
-        float size = h * 0.5f, tw = gfx.width(text, size), maxW = r - left - h * 0.6f;
+        float size = h * 0.5f, tw = gfx.width(text, size), maxW = r - left - h * (compact ? 0.25f : 0.6f);
         gfx.textC(c, text, (left + r) / 2, (t + b) / 2, tw > maxW ? size * maxW / tw : size, Color.WHITE, 0xFF3A1F08, Paint.Align.CENTER);
     }
 
@@ -119,7 +124,19 @@ final class Renderer {
         float m = 3 * v.u, hh = 13 * v.u, hudTop = v.topInset + m;
         // level + moves
         float mw = 27 * v.u;
-        drawPill(c, m + hh + m * 0.8f, hudTop, v.W - m - mw - m * 0.8f, hudTop + hh, (v.level.goalCounts[0] - v.need[v.level.ingredient()]) + "/" + v.level.goalCounts[0], v.level.ingredient());
+        float gl = m + hh + m * 0.8f, gr = v.W - m - mw - m * 0.8f;
+        int goals = v.level.goalKinds.length;
+        if (goals == 1) {
+            drawPill(c, gl, hudTop, gr, hudTop + hh, (v.level.goalCounts[0] - v.need[v.level.ingredient()]) + "/" + v.level.goalCounts[0], v.level.ingredient());
+        } else {
+            // several goals share the space, each showing what is still to collect
+            float gap = m * 0.5f, pw = (gr - gl - gap * (goals - 1)) / goals;
+            for (int i = 0; i < goals; i++) {
+                int kind = v.level.goalKinds[i];
+                float pl = gl + i * (pw + gap);
+                drawPill(c, pl, hudTop, pl + pw, hudTop + hh, "x" + v.need[kind], kind, true);
+            }
+        }
         float ml = v.W - m - mw, mr = v.W - m;
         gfx.rrect(c, ml, hudTop + hh * 0.07f, mr, hudTop + hh * 1.07f, hh / 2, Gfx.darken(PANEL, 0.6f));
         gfx.rrect(c, ml, hudTop, mr, hudTop + hh, hh / 2, PANEL);
@@ -202,6 +219,22 @@ final class Renderer {
         gfx.rrect(c, l, cy - h / 2 + v.u, rt, cy + h / 2 + v.u, 6 * v.u, Gfx.alpha(0xFF2B1606, 0.5f * a));
         gfx.rrect(c, l, cy - h / 2, rt, cy + h / 2, 6 * v.u, Gfx.alpha(PANEL, 0.96f * a));
         gfx.rrectLine(c, l + v.u * 0.4f, cy - h / 2 + v.u * 0.4f, rt - v.u * 0.4f, cy + h / 2 - v.u * 0.4f, 5.6f * v.u, v.u * 0.8f, Gfx.alpha(0xFFFF9B26, a));
+        if (v.level.multi()) {
+            // one row per goal: its picture, then how many to collect
+            int n = v.level.goalKinds.length;
+            float rowH = h / (n + 0.4f), rsz = rowH * 0.92f;
+            for (int i = 0; i < n; i++) {
+                int gk = v.level.goalKinds[i];
+                float ry = cy - h / 2 + h * 0.2f / (n + 0.4f) + rowH * (i + 0.5f);
+                gfx.circle(c, l + rowH * 0.9f, ry, rsz * 0.55f, Gfx.alpha(0xFFFFF4D2, a));
+                drawIcon(c, gk, l + rowH * 0.9f, ry, rsz, a);
+                String line = (i == 0 ? "Collect " : "and ") + v.level.goalCounts[i] + " " + Recipes.INGREDIENT[gk];
+                float lx = l + rowH * 1.7f, lmax = rt - lx - 3 * v.u, ls = rowH * 0.5f, lw = gfx.width(line, ls);
+                if (lw > lmax) ls *= lmax / lw;
+                gfx.textC(c, line, lx, ry, ls, Gfx.alpha(Color.WHITE, a), Gfx.alpha(0xFF3A1F08, a), Paint.Align.LEFT);
+            }
+            return;
+        }
         float isz = h * 0.82f;
         gfx.circle(c, l + h * 0.62f, cy, isz * 0.55f, Gfx.alpha(0xFFFFF4D2, a));
         drawIcon(c, kind, l + h * 0.62f, cy, isz, a);
