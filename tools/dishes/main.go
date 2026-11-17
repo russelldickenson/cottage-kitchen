@@ -72,6 +72,12 @@ func main() {
 		o, _ := os.Create(filepath.Join(dst, name+".png"))
 		png.Encode(o, res)
 		o.Close()
+		if name == "dish_strawberry_jam" {
+			// the launcher icon is built from a large copy of the jar (see tools/icon)
+			big, _ := os.Create(filepath.Join(root, "../icon/jam.png"))
+			png.Encode(big, fit(im, 1024, 16, true, 1))
+			big.Close()
+		}
 		fmt.Println("wrote", name)
 	}
 }
