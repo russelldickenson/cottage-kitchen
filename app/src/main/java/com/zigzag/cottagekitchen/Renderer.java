@@ -228,7 +228,8 @@ final class Renderer {
                 float ry = cy - h / 2 + h * 0.2f / (n + 0.4f) + rowH * (i + 0.5f);
                 gfx.circle(c, l + rowH * 0.9f, ry, rsz * 0.55f, Gfx.alpha(0xFFFFF4D2, a));
                 drawIcon(c, gk, l + rowH * 0.9f, ry, rsz, a);
-                String line = (i == 0 ? "Collect " : "and ") + v.level.goalCounts[i] + " " + Recipes.INGREDIENT[gk];
+                String line = gk == Art.CRATE ? "and break " + v.level.goalCounts[i] + (v.level.goalCounts[i] == 1 ? " crate" : " crates")
+                        : (i == 0 ? "Collect " : "and ") + v.level.goalCounts[i] + " " + Level.goalName(gk);
                 float lx = l + rowH * 1.7f, lmax = rt - lx - 3 * v.u, ls = rowH * 0.5f, lw = gfx.width(line, ls);
                 if (lw > lmax) ls *= lmax / lw;
                 gfx.textC(c, line, lx, ry, ls, Gfx.alpha(Color.WHITE, a), Gfx.alpha(0xFF3A1F08, a), Paint.Align.LEFT);
@@ -276,7 +277,7 @@ final class Renderer {
         float w = size * (1f + 0.12f * t.squash), h = size * (1f - 0.18f * t.squash);
         float bottom = y + oy + size / 2;
         if (!fx) gfx.ellipse(c, x, y + v.cell * 0.38f, v.cell * 0.3f * t.scale, v.cell * 0.06f * t.scale, 0x26000000);
-        Bitmap b = art[t.type];
+        Bitmap b = art[t.type == Art.CRATE && t.hp < Art.CRATE_HP ? Art.CRATE_CRACKED : t.type];
         src.set(0, 0, b.getWidth(), b.getHeight());
         dst.set(x + ox - w / 2, bottom - h, x + ox + w / 2, bottom);
         c.save();
@@ -330,18 +331,20 @@ final class Renderer {
         }
     }
 
-    private static final String[] TIP_NAME = {"Scarecrow", "TNT", "Golden Egg", "Rainbow Tractor"};
+    private static final String[] TIP_NAME = {"Scarecrow", "TNT", "Golden Egg", "Rainbow Tractor", "Crate"};
     private static final String[] TIP_USE = {
             "Swap it with a neighbour and it spins, sweeping away the 3x3 area around it.",
             "Swap it with a neighbour to blow up the 3x3 area around it.",
             "Swap it with any crop to harvest every one of that crop on the board.",
             "Swap it with any crop and it drives across the board, harvesting every one of that crop.",
+            "Crates can not be swapped. Match crops right beside one to crack it, and again to break it.",
     };
     private static final String[] TIP_MAKE = {
             "Make one by matching a T or L shape.",
             "Make one by matching a T or L shape.",
             "Make one by matching 5 in a row.",
             "Make one by matching 5 in a row.",
+            "Power-ups beside a crate hit it too.",
     };
 
     List<String> wrap(String text, float size, float maxW) {
@@ -372,7 +375,7 @@ final class Renderer {
         gfx.rrect(c, o.left, o.top, o.right, o.bottom, 6 * v.u, WOOD);
         gfx.rrect(c, o.left + v.u, o.top + v.u, o.right - v.u, o.bottom - v.u, 5 * v.u, CREAM);
         gfx.rrect(c, o.left - v.u, o.top - 3 * v.u, o.right + v.u, o.top + ph * 0.14f, 5 * v.u, ORANGE);
-        gfx.textC(c, "New Power-Up!", o.centerX(), o.top + ph * 0.045f, 7 * v.u, Color.WHITE, 0xFF7A3E0B, Paint.Align.CENTER);
+        gfx.textC(c, (v.tipType == Art.CRATE ? "New Obstacle!" : "New Power-Up!"), o.centerX(), o.top + ph * 0.045f, 7 * v.u, Color.WHITE, 0xFF7A3E0B, Paint.Align.CENTER);
 
         float iy = o.top + ph * 0.30f, isz = v.W * 0.3f + 2 * v.u * (float) Math.sin(v.time * 4);
         gfx.circle(c, o.centerX(), iy, isz * 0.62f, 0x55FFE066);

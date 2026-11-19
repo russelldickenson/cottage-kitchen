@@ -38,7 +38,7 @@ final class Board {
     int typeAt(int r, int c) {
         if (r < 0 || c < 0 || r >= rows || c >= cols) return -1;
         Tile t = g[r][c];
-        return t == null || Art.isSpecial(t.type) ? -1 : t.type;
+        return t == null || Art.isSpecial(t.type) || Art.isCrate(t.type) ? -1 : t.type;
     }
 
     private boolean makes3(int r, int c, int t) {
@@ -61,6 +61,31 @@ final class Board {
         } while (findMove() == null);
     }
 
+    /** Turns n tiles in the lower part of the board into crates (spread over different columns), keeping a legal move. */
+    void addCrates(int n, Random rnd) {
+        if (n <= 0) return;
+        int top = rows / 3;
+        while (true) {
+            List<Integer> order = new ArrayList<>();
+            for (int c = 0; c < cols; c++) order.add(c);
+            java.util.Collections.shuffle(order, rnd);
+            List<Tile> made = new ArrayList<>();
+            for (int i = 0; i < n; i++) {
+                int c = order.get(i % order.size()), r = top + rnd.nextInt(rows - top);
+                Tile t = g[r][c];
+                if (Art.isCrate(t.type)) continue;
+                t.type = Art.CRATE;
+                t.hp = Art.CRATE_HP;
+                made.add(t);
+            }
+            if (findMove() != null) return;
+            for (Tile t : made) {
+                t.type = pick();
+                t.hp = 0;
+            }
+        }
+    }
+
     /** Re-rolls the crop types of existing tiles in place. */
     void reshuffle() {
         do {
@@ -70,7 +95,7 @@ final class Board {
                     do {
                         t = pick();
                     } while (makes3(r, c, t));
-                    if (!Art.isSpecial(g[r][c].type)) g[r][c].type = t;
+                    if (!Art.isSpecial(g[r][c].type) && !Art.isCrate(g[r][c].type)) g[r][c].type = t;
                 }
             }
         } while (findMove() == null);
@@ -135,6 +160,7 @@ final class Board {
     }
 
     private boolean swapMatches(int r1, int c1, int r2, int c2) {
+        if (Art.isCrate(g[r1][c1].type) || Art.isCrate(g[r2][c2].type)) return false;
         if (Art.isSpecial(g[r1][c1].type) || Art.isSpecial(g[r2][c2].type)) return true;
         swap(r1, c1, r2, c2);
         boolean ok = !findRuns().isEmpty();

@@ -309,6 +309,7 @@ public class GameView extends View {
         confirmQuit = false;
         level = Level.get(idx);
         board = new Board(COLS, ROWS, level.kinds, rnd);
+        board.addCrates(level.crates(), rnd);
         need = new int[Art.COUNT];
         for (int i = 0; i < level.goalKinds.length; i++) need[level.goalKinds[i]] = level.goalCounts[i];
         movesLeft = level.moves;
@@ -319,7 +320,7 @@ public class GameView extends View {
         fx.clear();
         renderer.cook.clear();
         dying.clear();
-        pendingTip = -1;
+        pendingTip = level.crates() > 0 && !progress.tipSeen[Art.CRATE] ? Art.CRATE : -1;
         for (int r = 0; r < ROWS; r++) {
             for (int c = 0; c < COLS; c++) board.g[r][c].y = r - ROWS - rnd.nextFloat() * 1.5f - (COLS - c) * 0.1f;
         }
@@ -487,8 +488,24 @@ public class GameView extends View {
             if (first && combo > 1) addPop("Combo x" + combo + "!", W / 2, by + cell * 1.2f, cell * 0.8f, 1.1f, 0xFFFFD43B);
             first = false;
         }
+        breakCrates(seen, 0f);
         if (!spawns.tiles.isEmpty()) addPop(spawns.types.get(0) == Art.GOLDEN_EGG || spawns.types.get(0) == Art.TRACTOR ? "Super Harvest!" : "Big Bang!",
                 W / 2, by + cell * 2.4f, cell * 0.85f, 1.2f, 0xFFFF9B26);
+    }
+
+    /** Clears next to a crate (or catching it) hit it: it cracks, then breaks and counts toward the level goal. */
+    private void breakCrates(java.util.Collection<Tile> cleared, float delay) {
+        List<Tile> damaged = new ArrayList<>();
+        for (Tile t : Rules.hitCrates(board, cleared, damaged)) {
+            t.dyDelay = delay;
+            t.dying = true;
+            dying.add(t);
+            if (need[Art.CRATE] > 0) need[Art.CRATE]--;
+        }
+        for (Tile t : damaged) {
+            t.squash = 1f;
+            fx.sparkle(cx(t), cy(t), u, cell);
+        }
     }
 
     private void addPop(String text, float x, float y, float size, float life, int color) {
@@ -507,7 +524,9 @@ public class GameView extends View {
         spawns = new Rules.Spawns();
         fxTile = act;
         swapA = swapB = null;
-        List<Tile> list = new ArrayList<>(set);
+        // crates in the blast are hit like those beside it, not cleared outright
+        List<Tile> list = new ArrayList<>();
+        for (Tile t : set) if (!Art.isCrate(t.type)) list.add(t);
         list.sort((x, y) -> Integer.compare(Math.abs(x.r - act.r) + Math.abs(x.c - act.c), Math.abs(y.r - act.r) + Math.abs(y.c - act.c)));
         float maxDelay = 0;
         for (int i = 0; i < list.size(); i++) {
@@ -527,6 +546,7 @@ public class GameView extends View {
             }
             maxDelay = Math.max(maxDelay, d);
         }
+        breakCrates(set, maxDelay);
         act.dyDelay = maxDelay;
         sfx.powerUpPlayed(banner == null ? act.type : Art.TNT);
         clearDuration = CLEAR_TIME + maxDelay;
@@ -597,6 +617,11 @@ public class GameView extends View {
 
     private void attemptSwap(Tile a, Tile b) {
         if (phase != Phase.IDLE || Math.abs(a.r - b.r) + Math.abs(a.c - b.c) != 1) return;
+        if (Art.isCrate(a.type) || Art.isCrate(b.type)) {
+            selected = null;
+            sfx.badSwap();
+            return;
+        }
         board.swap(a.r, a.c, b.r, b.c);
         sfx.swap();
         swapA = a;
@@ -672,6 +697,10 @@ public class GameView extends View {
     }
 
     private void tap(Tile t) {
+        if (Art.isCrate(t.type)) {
+            selected = null;
+            return;
+        }
         if (selected == null) selected = t;
         else if (selected == t) selected = null;
         else if (Math.abs(selected.r - t.r) + Math.abs(selected.c - t.c) == 1) attemptSwap(selected, t);

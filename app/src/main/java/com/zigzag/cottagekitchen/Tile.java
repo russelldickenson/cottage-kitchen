@@ -9,6 +9,8 @@ final class Tile {
     float squash;
     boolean dying, popped;
     float dyDelay;
+    /** Hits a crate has left; 0 for everything else. */
+    int hp;
 
     Tile(int type, int r, int c) {
         this.type = type;

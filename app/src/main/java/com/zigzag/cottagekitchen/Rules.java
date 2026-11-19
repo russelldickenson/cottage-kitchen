@@ -87,6 +87,30 @@ final class Rules {
         return set;
     }
 
+    /**
+     * Crates next to a cleared tile, or caught in the clear themselves, lose one hit each (once per clear).
+     * Returns the crates that broke; those that only cracked go into damaged.
+     */
+    static List<Tile> hitCrates(Board board, java.util.Collection<Tile> cleared, List<Tile> damaged) {
+        Set<Tile> hit = new LinkedHashSet<>();
+        int[][] dirs = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+        for (Tile t : cleared) {
+            if (Art.isCrate(t.type)) hit.add(t);
+            else for (int[] d : dirs) {
+                int nr = t.r + d[0], nc = t.c + d[1];
+                if (nr < 0 || nc < 0 || nr >= board.rows || nc >= board.cols) continue;
+                Tile n = board.g[nr][nc];
+                if (n != null && Art.isCrate(n.type)) hit.add(n);
+            }
+        }
+        List<Tile> broken = new ArrayList<>();
+        for (Tile c : hit) {
+            if (--c.hp <= 0) broken.add(c);
+            else damaged.add(c);
+        }
+        return broken;
+    }
+
     static boolean goalsDone(int[] need) {
         for (int n : need) if (n > 0) return false;
         return true;

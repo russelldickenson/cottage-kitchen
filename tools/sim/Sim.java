@@ -34,12 +34,18 @@ public class Sim {
 
     static Board clone(Board b, int[] pal) {
         Board c = new Board(COLS, ROWS, pal, rnd);
-        for (int r = 0; r < ROWS; r++) for (int col = 0; col < COLS; col++) c.g[r][col].type = b.g[r][col].type;
+        for (int r = 0; r < ROWS; r++) {
+            for (int col = 0; col < COLS; col++) {
+                c.g[r][col].type = b.g[r][col].type;
+                c.g[r][col].hp = b.g[r][col].hp;
+            }
+        }
         return c;
     }
 
     static boolean valid(Board b, int[] m) {
         Tile a = b.g[m[0]][m[1]], t = b.g[m[2]][m[3]];
+        if (Art.isCrate(a.type) || Art.isCrate(t.type)) return false;
         if (Art.isSpecial(a.type) || Art.isSpecial(t.type)) return true;
         b.swap(m[0], m[1], m[2], m[3]);
         boolean ok = !b.findRuns().isEmpty();
@@ -82,6 +88,16 @@ public class Sim {
         s.moves--;
         double gain = 0;
         while (true) {
+            List<Tile> damaged = new ArrayList<>();
+            List<Tile> broken = Rules.hitCrates(b, counted, damaged);
+            gain += damaged.size();
+            for (Tile t : broken) {
+                if (s.need[Art.CRATE] > 0) s.need[Art.CRATE]--;
+                gain += 3;
+            }
+            counted.removeIf(t -> Art.isCrate(t.type));
+            clear.removeIf(t -> Art.isCrate(t.type));
+            clear.addAll(broken);
             for (Tile t : counted) {
                 if (t.type < Art.CROPS && s.need[t.type] > 0) {
                     s.need[t.type]--;
@@ -123,6 +139,7 @@ public class Sim {
     static int playLevel(Level lv, double skill) {
         powerUpsOn = lv.powerUps();
         Board b = new Board(COLS, ROWS, lv.kinds, rnd);
+        b.addCrates(lv.crates(), rnd);
         State s = new State();
         for (int i = 0; i < lv.goalKinds.length; i++) s.need[lv.goalKinds[i]] = lv.goalCounts[i];
         s.moves = lv.moves;
@@ -182,7 +199,7 @@ public class Sim {
                 int scale = Level.scaleFor(i);
                 double target = expertMoves(i, scale, games);
                 int moves = Math.max(9, (int) Math.ceil(target * slack));
-                System.out.printf("level %2d  %-18s %-12s collect %3d  expert needs %.1f  budget %d (x%.2f)%n", i + 1, Level.get(i).recipe.name, Recipes.INGREDIENT[Level.get(i).ingredient()], scale, target, moves, slack);
+                System.out.printf("level %2d  %-18s %-12s collect %3d  expert needs %.1f  budget %d (x%.2f)%n", i + 1, Level.get(i).recipe.name, Recipes.INGREDIENT[Level.get(i).ingredient()] + (Level.get(i).crates() > 0 ? "+crates" : ""), scale, target, moves, slack);
                 sm.append(moves).append(i + 1 < Level.COUNT ? ", " : "");
             }
             System.out.println("MOVES = {" + sm + "}");

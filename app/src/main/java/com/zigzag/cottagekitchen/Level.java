@@ -13,12 +13,15 @@ final class Level {
     /** From this level number, the later ingredients of a dish also ask for one earlier ingredient of the same dish. */
     static final int MULTI_LEVEL = 16;
 
+    /** From this level number, every other multi-goal level asks for crates to be broken instead of a second ingredient. */
+    static final int CRATE_LEVEL = 20;
+
     /** Move budgets, produced by tools/sim/run.sh (tune) from how fast an expert bot collects each order. */
     private static final int[] MOVES = {
             11, 11, 11, 12, 12, 11, 12, 12, 12, 12, 12, 11, 11, 12, 12,
-            13, 13, 16, 13, 14, 14, 14, 15, 15, 15, 15, 15, 16, 17, 15,
-            17, 17, 17, 16, 18, 18, 18, 16, 18, 18, 18, 17, 19, 18, 18,
-            18, 19, 19, 19};
+            13, 13, 16, 13, 14, 14, 14, 15, 15, 15, 15, 15, 17, 17, 16,
+            19, 18, 18, 16, 20, 18, 19, 17, 20, 18, 19, 18, 20, 17, 21,
+            18, 20, 19, 20};
 
     /** Position in the book, then the ingredient within the dish. */
     final int number, dish, step;
@@ -50,6 +53,17 @@ final class Level {
 
     boolean multi() {
         return goalKinds.length > 1;
+    }
+
+    /** How many crates this level puts on the board (and asks to break). */
+    int crates() {
+        for (int i = 0; i < goalKinds.length; i++) if (goalKinds[i] == Art.CRATE) return goalCounts[i];
+        return 0;
+    }
+
+    /** Name of a goal for the interface: a crop, or the crates. */
+    static String goalName(int kind) {
+        return kind == Art.CRATE ? "Crates" : Recipes.INGREDIENT[kind];
     }
 
     boolean lastStep() {
@@ -86,6 +100,11 @@ final class Level {
             filler = (filler + 1) % Art.CROPS;
         }
         if (index + 1 >= MULTI_LEVEL && step > 0) {
+            if (index + 1 >= CRATE_LEVEL && index % 2 == 0) {
+                // break crates next to matches: more of them later in the book
+                int crates = Math.min(4, 2 + (index - CRATE_LEVEL + 1) / 10);
+                return new Level(index + 1, dish, step, kinds, new int[]{rc.ingredients[step], Art.CRATE}, new int[]{count, crates}, moves);
+            }
             // the main ingredient as usual, plus 70% as much of an earlier one (varied by level)
             int extra = rc.ingredients[index % step];
             return new Level(index + 1, dish, step, kinds, new int[]{rc.ingredients[step], extra},
