@@ -32,7 +32,7 @@ fi
 
 export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
 [[ -d "$ANDROID_HOME" ]] || { print -u2 "error: Android SDK not found at $ANDROID_HOME (set ANDROID_HOME)."; exit 1; }
-[[ -f "$ANDROID_KEYSTORE_PATH" ]] || { print -u2 "error: keystore not found at $ANDROID_KEYSTORE_PATH."; exit 1; }
+[[ -s "$ANDROID_KEYSTORE_PATH" ]] || { print -u2 "error: keystore missing or empty at $ANDROID_KEYSTORE_PATH."; exit 1; }
 
 print "Building release APK..."
 ./gradlew --console=plain -q assembleRelease

@@ -59,6 +59,28 @@ jobs:
             | base64 --decode \
             > "$RUNNER_TEMP/signing-keystore.jks"
 
+      - name: Verify signing keystore
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYSTORE="$RUNNER_TEMP/signing-keystore.jks"
+
+          if [[ ! -s "$KEYSTORE" ]]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 is empty or missing. Store the base64-encoded .p12 as a repository secret and check the secret is visible to this repo."
+            exit 1
+          fi
+          if [[ -z "${ANDROID_KEYSTORE_PASSWORD:-}" ]]; then
+            echo "::error::ANDROID_KEYSTORE_PASSWORD is empty or missing."
+            exit 1
+          fi
+          if ! keytool -list -keystore "$KEYSTORE" -storepass "$ANDROID_KEYSTORE_PASSWORD" >/dev/null 2>&1; then
+            echo "::error::The decoded keystore could not be opened with ANDROID_KEYSTORE_PASSWORD. Check both secrets."
+            exit 1
+          fi
+          echo "Signing keystore decoded and validated."
+
       - name: Build signed APK
         shell: bash
         env:
