@@ -2,10 +2,34 @@ plugins {
     id 'com.android.application'
 }
 
+// Signing inputs are injected from outside the repository so no credentials are checked in.
+// build.sh and the GitHub Actions workflows use the same ANDROID_* environment names;
+// -P signing.* properties are also accepted for local overrides.
+def signingValue = { String property, String envName ->
+    providers.gradleProperty(property)
+        .orElse(providers.environmentVariable(envName))
+        .orNull
+}
+
+def releaseKeystore      = signingValue('signing.storeFile',     'ANDROID_KEYSTORE_PATH')
+def releaseStorePassword = signingValue('signing.storePassword', 'ANDROID_KEYSTORE_PASSWORD')
+// The alias is not a secret. Each app repo sets its own via signing.defaultKeyAlias in
+// gradle.properties; ANDROID_KEY_ALIAS in the environment overrides it when needed.
+def releaseKeyAlias      = signingValue('signing.keyAlias',      'ANDROID_KEY_ALIAS')
+        ?: providers.gradleProperty('signing.defaultKeyAlias').orNull
+        ?: 'cottagekitchen'
+// PKCS12 uses one password for the store and its keys.
+def releaseKeyPassword   = signingValue('signing.keyPassword',  'ANDROID_KEY_PASSWORD') ?: releaseStorePassword
+
 // Platform SDK only: no AndroidX, no third-party dependencies.
 android {
     namespace 'com.zigzag.cottagekitchen'
     compileSdk 36
+
+    if (releaseKeystore && (!releaseStorePassword || !releaseKeyAlias || !releaseKeyPassword)) {
+        throw new GradleException('Incomplete release signing config: a keystore path is set but ' +
+            'the store password, key alias or key password is missing.')
+    }
 
     defaultConfig {
         applicationId 'com.zigzag.cottagekitchen'
@@ -15,16 +39,13 @@ android {
         versionName '1.0'
     }
 
-    // Release signing comes from the environment (set by build.sh), so no secrets live in this file.
-    // Without COTTAGEKITCHEN_KEYSTORE the release build is simply left unsigned.
-    def keystorePath = System.getenv('COTTAGEKITCHEN_KEYSTORE')
     signingConfigs {
         release {
-            if (keystorePath) {
-                storeFile file(keystorePath)
-                storePassword System.getenv('COTTAGEKITCHEN_KEYSTORE_PASSWORD')
-                keyAlias System.getenv('COTTAGEKITCHEN_KEY_ALIAS')
-                keyPassword System.getenv('COTTAGEKITCHEN_KEY_PASSWORD')
+            if (releaseKeystore) {
+                storeFile file(releaseKeystore)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
             }
         }
     }
@@ -32,12 +53,30 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            if (keystorePath) signingConfig signingConfigs.release
+            if (releaseKeystore) signingConfig signingConfigs.release
         }
     }
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+    }
+
+    // Name the built APKs cottage_kitchen.apk instead of app-<variant>.apk.
+    applicationVariants.configureEach { variant ->
+        variant.outputs.configureEach { output ->
+            output.outputFileName = 'cottage_kitchen.apk'
+        }
+    }
+}
+
+// The reusable workflow uploads release APKs as *signed* artifacts. Fail rather than silently
+// producing an unsigned cottage_kitchen.apk when CI has no signing configuration.
+tasks.matching { it.name == 'assembleRelease' }.configureEach {
+    doFirst {
+        if (System.getenv('CI') == 'true' && !releaseKeystore) {
+            throw new GradleException('Release signing is not configured in CI. Set ANDROID_KEYSTORE_PATH ' +
+                'and ANDROID_KEYSTORE_PASSWORD (ANDROID_KEY_ALIAS is optional - see gradle.properties).')
+        }
     }
 }
