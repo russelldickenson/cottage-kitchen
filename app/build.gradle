@@ -13,22 +13,30 @@ def signingValue = { String property, String envName ->
 
 def releaseKeystore      = signingValue('signing.storeFile',     'ANDROID_KEYSTORE_PATH')
 def releaseStorePassword = signingValue('signing.storePassword', 'ANDROID_KEYSTORE_PASSWORD')
-// The alias is not a secret. Each app repo sets its own via signing.defaultKeyAlias in
-// gradle.properties; ANDROID_KEY_ALIAS in the environment overrides it when needed.
+// The alias is not a secret, but it is required: each app repo sets its own in
+// gradle.properties. ANDROID_KEY_ALIAS in the environment overrides it when needed.
 def releaseKeyAlias      = signingValue('signing.keyAlias',      'ANDROID_KEY_ALIAS')
         ?: providers.gradleProperty('signing.defaultKeyAlias').orNull
-        ?: 'cottagekitchen'
 // PKCS12 uses one password for the store and its keys.
 def releaseKeyPassword   = signingValue('signing.keyPassword',  'ANDROID_KEY_PASSWORD') ?: releaseStorePassword
+
+// Single per-app setting for the output filename, shared with build.sh.
+def apkOutputFileName    = providers.gradleProperty('apk.outputFileName').orNull
+        ?: "${rootProject.name}.apk"
 
 // Platform SDK only: no AndroidX, no third-party dependencies.
 android {
     namespace 'com.zigzag.cottagekitchen'
     compileSdk 36
 
-    if (releaseKeystore && (!releaseStorePassword || !releaseKeyAlias || !releaseKeyPassword)) {
-        throw new GradleException('Incomplete release signing config: a keystore path is set but ' +
-            'the store password, key alias or key password is missing.')
+    if (releaseKeystore) {
+        def missing = []
+        if (!releaseStorePassword) missing << 'ANDROID_KEYSTORE_PASSWORD'
+        if (!releaseKeyAlias) missing << 'ANDROID_KEY_ALIAS or signing.defaultKeyAlias'
+        if (!releaseKeyPassword) missing << 'ANDROID_KEY_PASSWORD'
+        if (missing) {
+            throw new GradleException('Incomplete release signing config: ' + missing.join(', '))
+        }
     }
 
     defaultConfig {
@@ -62,21 +70,24 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
-    // Name the built APKs cottage_kitchen.apk instead of app-<variant>.apk.
+    // Name the built APKs from gradle.properties instead of app-<variant>.apk.
     applicationVariants.configureEach { variant ->
         variant.outputs.configureEach { output ->
-            output.outputFileName = 'cottage_kitchen.apk'
+            output.outputFileName = apkOutputFileName
         }
     }
 }
 
 // The reusable workflow uploads release APKs as *signed* artifacts. Fail rather than silently
-// producing an unsigned cottage_kitchen.apk when CI has no signing configuration.
+// producing an unsigned APK when CI has no signing configuration.
 tasks.matching { it.name == 'assembleRelease' }.configureEach {
     doFirst {
         if (System.getenv('CI') == 'true' && !releaseKeystore) {
             throw new GradleException('Release signing is not configured in CI. Set ANDROID_KEYSTORE_PATH ' +
                 'and ANDROID_KEYSTORE_PASSWORD (ANDROID_KEY_ALIAS is optional - see gradle.properties).')
+        }
+        if (!providers.gradleProperty('apk.outputFileName').orNull) {
+            throw new GradleException('Set apk.outputFileName in gradle.properties.')
         }
     }
 }

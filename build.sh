@@ -10,6 +10,8 @@
 #   export ANDROID_KEYSTORE_PATH="$HOME/.android-signing/android-shared.p12"
 #   export ANDROID_KEYSTORE_PASSWORD="$( ... )"
 #   ./build.sh
+#
+# The output filename comes from apk.outputFileName in gradle.properties.
 
 set -euo pipefail
 
@@ -37,8 +39,10 @@ export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
 print "Building release APK..."
 ./gradlew --console=plain -q assembleRelease
 
-APK="$ROOT/app/build/outputs/apk/release/cottage_kitchen.apk"
-[[ -f "$APK" ]] || { print -u2 "error: build finished but $APK was not produced."; exit 1; }
+APK_NAME=$(sed -n 's/^apk\.outputFileName=//p' "$ROOT/gradle.properties" | head -1)
+[[ -n "$APK_NAME" ]] || { print -u2 "error: apk.outputFileName is not set in $ROOT/gradle.properties."; exit 1; }
+APK="$ROOT/app/build/outputs/apk/release/$APK_NAME"
+[[ -s "$APK" ]] || { print -u2 "error: build finished but $APK was not produced."; exit 1; }
 
 # Check the signature if the SDK has apksigner (newest build-tools first).
 APKSIGNER=("$ANDROID_HOME"/build-tools/*/apksigner(N.On[1]))
@@ -48,4 +52,4 @@ fi
 
 print "\nSigned APK: $APK"
 
-cp "$APK" cottage_kitchen.apk
+cp "$APK" "$ROOT/$APK_NAME"
