@@ -280,11 +280,11 @@ public class GameView extends View {
         if (won) {
             boolean hasNext = levelIndex + 1 < Level.COUNT;
             float usable = total - 2 * gap, wR = usable * 0.36f, wN = usable * 0.34f, wM = usable * 0.30f;
-            addWide(m + wR / 2, cy, wR, h, "REPLAY", ORANGE, () -> startLevel(levelIndex)).icon = ICON_REPLAY;
-            Button next = addWide(m + wR + gap + wN / 2, cy, wN, h, hasNext ? "NEXT" : "DONE", GREEN,
+            addWide(m + wM / 2, cy, wM, h, "Recipes", BLUE, this::goBook);
+            addWide(m + wM + gap + wR / 2, cy, wR, h, "Replay", ORANGE, () -> startLevel(levelIndex)).icon = ICON_REPLAY;
+            Button next = addWide(m + wM + gap + wR + gap + wN / 2, cy, wN, h, hasNext ? "Next" : "DONE", GREEN,
                     hasNext ? () -> startLevel(levelIndex + 1) : this::goBook);
             if (hasNext) next.icon = ICON_NEXT;
-            addWide(W - m - wM / 2, cy, wM, h, "BOOK", BLUE, this::goBook);
         } else {
             float usable = total - gap, wT = usable * 0.6f, wM = usable * 0.4f;
             addWide(m + wT / 2, cy, wT, h, "TRY AGAIN", GREEN, () -> startLevel(levelIndex)).icon = ICON_REPLAY;
