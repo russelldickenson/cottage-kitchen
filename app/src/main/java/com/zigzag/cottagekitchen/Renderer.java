@@ -370,14 +370,41 @@ final class Renderer {
         c.save();
         c.translate(0, (1f - ease) * -v.H * 0.25f * (k < 1 ? 1 : 0));
         RectF o = v.tipBox;
-        float ph = o.height(), idx = v.tipType - Art.CROPS;
+        float ph = o.height();
         gfx.rrect(c, o.left, o.top + 1.5f * v.u, o.right, o.bottom + 1.5f * v.u, 6 * v.u, Gfx.darken(WOOD, 0.6f));
         gfx.rrect(c, o.left, o.top, o.right, o.bottom, 6 * v.u, WOOD);
         gfx.rrect(c, o.left + v.u, o.top + v.u, o.right - v.u, o.bottom - v.u, 5 * v.u, CREAM);
         gfx.rrect(c, o.left - v.u, o.top - 3 * v.u, o.right + v.u, o.top + ph * 0.14f, 5 * v.u, ORANGE);
-        gfx.textC(c, (v.tipType == Art.CRATE ? "New Obstacle!" : "New Power-Up!"), o.centerX(), o.top + ph * 0.045f, 7 * v.u, Color.WHITE, 0xFF7A3E0B, Paint.Align.CENTER);
+        String heading = v.tipType == GameView.TIP_INTRO ? "How to Play"
+                : v.tipType == Art.CRATE ? "New Obstacle!" : "New Power-Up!";
+        gfx.textC(c, heading, o.centerX(), o.top + ph * 0.045f, 7 * v.u, Color.WHITE, 0xFF7A3E0B, Paint.Align.CENTER);
 
-        float iy = o.top + ph * 0.30f, isz = v.W * 0.3f + 2 * v.u * (float) Math.sin(v.time * 4);
+        float iy = o.top + ph * 0.30f;
+        if (v.tipType == GameView.TIP_INTRO) {
+            // three of a kind: the one rule a new player has to learn
+            float isz = v.W * 0.15f + v.u * (float) Math.sin(v.time * 4), gap = isz * 1.15f;
+            for (int i = -1; i <= 1; i++) {
+                gfx.circle(c, o.centerX() + i * gap, iy, isz * 0.62f, 0x55FFE066);
+                drawIcon(c, 0, o.centerX() + i * gap, iy, isz);
+            }
+            gfx.textC(c, "Match 3 in a row", o.centerX(), o.top + ph * 0.485f, 6.6f * v.u, 0xFFFFC928, 0xFF7A3E0B, Paint.Align.CENTER);
+            float maxW = o.width() - 12 * v.u, size = 4f * v.u, ly = o.top + ph * 0.56f;
+            for (String line : wrap("Swap two tiles to line up three of a kind.", size, maxW)) {
+                gfx.textC(c, line, o.centerX(), ly, size, 0xFF6B3F17, 0, Paint.Align.CENTER);
+                ly += size * 1.35f;
+            }
+            ly += size * 0.5f;
+            for (String line : wrap("Collect the target before your moves run out.", size, maxW)) {
+                gfx.textC(c, line, o.centerX(), ly, size, 0xFFD06A00, 0, Paint.Align.CENTER);
+                ly += size * 1.35f;
+            }
+            drawButtons(c);
+            c.restore();
+            return;
+        }
+
+        float idx = v.tipType - Art.CROPS;
+        float isz = v.W * 0.3f + 2 * v.u * (float) Math.sin(v.time * 4);
         gfx.circle(c, o.centerX(), iy, isz * 0.62f, 0x55FFE066);
         drawIcon(c, v.tipType, o.centerX(), iy, isz);
         gfx.textC(c, TIP_NAME[(int) idx], o.centerX(), o.top + ph * 0.485f, 6.6f * v.u, 0xFFFFC928, 0xFF7A3E0B, Paint.Align.CENTER);

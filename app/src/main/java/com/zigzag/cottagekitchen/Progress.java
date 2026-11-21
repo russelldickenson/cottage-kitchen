@@ -7,6 +7,7 @@ import android.content.SharedPreferences;
 final class Progress {
     int unlocked;
     boolean soundOn;
+    boolean introSeen;
     final int[] bestStars = new int[Level.COUNT];
     final boolean[] tipSeen = new boolean[Art.COUNT];
     private final SharedPreferences prefs;
@@ -15,6 +16,7 @@ final class Progress {
         prefs = ctx.getSharedPreferences("cottagekitchen", Context.MODE_PRIVATE);
         unlocked = Math.max(1, Math.min(Level.COUNT, prefs.getInt("unlocked", 1)));
         soundOn = prefs.getBoolean("sound", true);
+        introSeen = prefs.getBoolean("intro", false);
         for (int t = Art.CROPS; t < Art.COUNT; t++) tipSeen[t] = prefs.getBoolean("tip_" + t, false);
         for (int i = 0; i < Level.COUNT; i++) bestStars[i] = prefs.getInt("stars_" + i, 0);
     }
@@ -57,6 +59,11 @@ final class Progress {
     void setSound(boolean on) {
         soundOn = on;
         prefs.edit().putBoolean("sound", on).apply();
+    }
+
+    void introShown() {
+        introSeen = true;
+        prefs.edit().putBoolean("intro", true).apply();
     }
 
     void tipShown(int type) {

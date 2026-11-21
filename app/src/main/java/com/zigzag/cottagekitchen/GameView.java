@@ -22,6 +22,8 @@ public class GameView extends View {
     enum Screen {TITLE, BOOK, PLAY, RESULT}
 
     static final int ICON_NONE = 0, ICON_CHEF = 1, ICON_NEXT = 2, ICON_REPLAY = 3;
+    /** tipType value for the one-time "how to play" card, before any power-up tips. */
+    static final int TIP_INTRO = -1;
 
     enum Phase {IDLE, SWAP, SWAPBACK, CLEAR, FALL, DONE, TIP}
 
@@ -57,6 +59,7 @@ public class GameView extends View {
     float clearDuration = CLEAR_TIME;
     float doneT, tipT;
     int pendingTip = -1, tipType;
+    boolean pendingIntro;
 
     // layout
     float W, H, topInset, botInset, u;
@@ -174,7 +177,8 @@ public class GameView extends View {
             }
         } else if (phase == Phase.TIP) {
             addWide(tipBox.centerX(), tipBox.top + tipBox.height() * 0.9f, tipBox.width() * 0.6f, tipBox.height() * 0.11f, "GOT IT!", GREEN, () -> {
-                progress.tipShown(tipType);
+                if (tipType == TIP_INTRO) progress.introShown();
+                else progress.tipShown(tipType);
                 phase = Phase.IDLE;
                 idleTime = 0;
                 buildButtons();
@@ -321,6 +325,7 @@ public class GameView extends View {
         renderer.cook.clear();
         dying.clear();
         pendingTip = level.crates() > 0 && !progress.tipSeen[Art.CRATE] ? Art.CRATE : -1;
+        pendingIntro = idx == 0 && progress.unlocked == 1 && !progress.introSeen;
         for (int r = 0; r < ROWS; r++) {
             for (int c = 0; c < COLS; c++) board.g[r][c].y = r - ROWS - rnd.nextFloat() * 1.5f - (COLS - c) * 0.1f;
         }
@@ -589,7 +594,13 @@ public class GameView extends View {
         phase = Phase.IDLE;
         idleTime = 0;
         hint = null;
-        if (pendingTip >= 0) {
+        if (pendingIntro) {
+            pendingIntro = false;
+            tipType = TIP_INTRO;
+            tipT = 0;
+            phase = Phase.TIP;
+            buildButtons();
+        } else if (pendingTip >= 0) {
             tipType = pendingTip;
             pendingTip = -1;
             tipT = 0;
