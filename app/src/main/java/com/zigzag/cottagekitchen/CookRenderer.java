@@ -232,6 +232,71 @@ final class CookRenderer {
         v.renderer.drawButtons(c);
     }
 
+    // ---------------------------------------------------------------- recipe (the levels of one dish)
+
+    /** Each dish is a group of ingredient levels; this screen is the group's menu. */
+    void drawRecipe(Canvas c) {
+        Recipes.Recipe rc = Recipes.ALL[v.recipe];
+        float m = 3 * v.u, u = v.u;
+        boolean cooked = v.progress.recipeDone(v.recipe);
+        gfx.textC(c, rc.name, v.W / 2, v.topInset + m + 6.5f * u,
+                fitSize(rc.name, 7.5f * u, v.W - 40 * u), Color.WHITE, 0xFF1F5F10, Paint.Align.CENTER);
+
+        RectF hero = v.recipeDish;
+        gfx.circle(c, hero.centerX(), hero.centerY() + hero.height() * 0.1f, hero.width() * 0.5f, 0x33FFD43B);
+        drawDish(c, rc, hero.centerX(), hero.centerY(), hero.height(), !cooked);
+        int have = v.progress.ingredientsDone(v.recipe), n = rc.ingredients.length;
+        gfx.textC(c, have + " of " + n + " ingredients", v.W / 2, hero.bottom + 2.2f * u,
+                4.2f * u, 0xFF8B5A2B, 0, Paint.Align.CENTER);
+
+        int next = v.progress.nextStep(v.recipe);
+        for (int i = 0; i < v.recipeStepCount; i++) {
+            RectF k = v.recipeNode[i];
+            boolean done = v.progress.ingredientDone(v.recipe, i);
+            boolean isNext = i == next, locked = i > next;
+            float press = v.recipePressed == i ? 0.5f * u : 0;
+            gfx.rrect(c, k.left, k.top + 0.8f * u, k.right, k.bottom + 0.8f * u, 2.6f * u, Gfx.darken(WOOD, 0.6f));
+            gfx.rrect(c, k.left, k.top + press, k.right, k.bottom + press, 2.6f * u, isNext ? 0xFFFF9B26 : WOOD);
+            gfx.rrect(c, k.left + 0.5f * u, k.top + press + 0.5f * u, k.right - 0.5f * u,
+                    k.bottom + press - 0.5f * u, 2.1f * u, locked ? 0xFFE3DDD0 : CREAM);
+            float cx = k.centerX(), iy = k.top + k.height() * 0.36f;
+            float isz = Math.min(k.width() * 0.5f, k.height() * 0.32f);
+            if (locked) gfx.lock(c, cx, iy, isz * 0.5f);
+            else {
+                r.drawIcon(c, rc.ingredients[i], cx, iy, isz, done ? 1f : 0.65f);
+                if (done) gfx.check(c, cx + isz * 0.34f, iy + isz * 0.28f, isz * 0.22f);
+            }
+            String name = Recipes.INGREDIENT[rc.ingredients[i]];
+            gfx.textC(c, name, cx, k.top + k.height() * 0.68f,
+                    fitSize(name, Math.min(k.height() * 0.13f, k.width() * 0.15f), k.width() * 0.88f),
+                    locked ? 0xFFA8A8A8 : 0xFF6B3F17, 0, Paint.Align.CENTER);
+            int s = v.progress.bestStars[Recipes.firstLevel(v.recipe) + i];
+            float sy = k.top + k.height() * 0.9f, ss = Math.min(k.height() * 0.075f, k.width() * 0.09f);
+            for (int j = 0; j < 3; j++) gfx.star(c, cx + (j - 1) * ss * 1.8f, sy, ss,
+                    j < s ? 0xFFFFD43B : 0xFFCDBFA0, j < s ? 0xFFC97700 : 0xFFA89878);
+        }
+        v.renderer.drawButtons(c);
+        if (v.showCelebration) drawCelebration(c);
+    }
+
+    /** A short "Order up!" moment on the recipe screen when its last ingredient is collected. */
+    private void drawCelebration(Canvas c) {
+        float t = v.celebrateT;
+        float a = t < 0.25f ? t / 0.25f : t > 2f ? (2.4f - t) / 0.4f : 1f;
+        a = Math.max(0f, Math.min(1f, a));
+        RectF hero = v.recipeDish;
+        float ds = hero.height() * 0.6f;
+        for (int i = 0; i < 8; i++) {
+            double ang = t * 1.2 + i * Math.PI / 4;
+            gfx.star(c, hero.centerX() + (float) Math.cos(ang) * ds * 0.62f,
+                    hero.centerY() + (float) Math.sin(ang) * ds * 0.42f, ds * 0.06f,
+                    Gfx.alpha(0xFFFFD43B, 0.9f * a), 0);
+        }
+        String txt = "Order up!";
+        gfx.textC(c, txt, hero.centerX(), hero.centerY(), fitSize(txt, 8 * v.u, hero.width() * 0.9f),
+                Gfx.alpha(0xFFFFD43B, a), Gfx.alpha(0xFF7A3E0B, a), Paint.Align.CENTER);
+    }
+
     // ---------------------------------------------------------------- result
 
     void drawResult(Canvas c) {
@@ -243,51 +308,34 @@ final class CookRenderer {
         gfx.rrect(c, o.left, o.top, o.right, o.bottom, 6 * v.u, WOOD);
         gfx.rrect(c, o.left + v.u, o.top + v.u, o.right - v.u, o.bottom - v.u, 5 * v.u, CREAM);
         gfx.rrect(c, o.left - v.u, o.top - 3 * v.u, o.right + v.u, o.top + ph * 0.12f, 5 * v.u, v.won ? Gfx.GREEN : 0xFFFF7A66);
-        String title = !v.won ? "Out of moves" : lv.lastStep() ? "Order up!" : Recipes.INGREDIENT[lv.ingredient()] + " collected!";
+        String title = !v.won ? "Out of moves" : Recipes.INGREDIENT[lv.ingredient()] + " collected!";
         gfx.textC(c, title, o.centerX(), o.top + ph * 0.04f, fitSize(title, 7.5f * v.u, pw - 8 * v.u), Color.WHITE, v.won ? 0xFF1F5F10 : 0xFF8A2A1A, Paint.Align.CENTER);
 
+        // the dish fill is the only progress cue here; the recipe screen now owns the step-by-step detail
         int have = v.progress.ingredientsDone(lv.dish);
-        float dy = o.top + ph * 0.30f, ds = Math.min(pw * 0.5f, ph * 0.28f);
-        float bounce = v.won && lv.lastStep() ? Math.abs((float) Math.sin(v.time * 4)) * 1.5f * v.u : 0;
-        if (v.won && lv.lastStep()) {
-            for (int i = 0; i < 8; i++) {
-                double a = v.time * 1.2 + i * Math.PI / 4;
-                gfx.star(c, o.centerX() + (float) Math.cos(a) * ds * 0.75f, dy + (float) Math.sin(a) * ds * 0.62f, ds * 0.07f, Gfx.alpha(0xFFFFD43B, 0.9f), 0);
-            }
-        }
-        drawDishFilling(c, lv.recipe, o.centerX(), dy - bounce, ds, have / (float) n);
-        gfx.textC(c, lv.recipe.name, o.centerX(), o.top + ph * 0.50f, fitSize(lv.recipe.name, 7f * v.u, pw - 10 * v.u), 0xFF6B3F17, 0, Paint.Align.CENTER);
+        float ds = Math.min(pw * 0.5f, ph * 0.28f);
+        float dishY = o.top + ph * (v.won ? 0.72f : 0.32f);
+        drawDishFilling(c, lv.recipe, o.centerX(), dishY, ds, have / (float) n);
+        gfx.textC(c, lv.recipe.name, o.centerX(), o.top + ph * (v.won ? 0.9f : 0.48f),
+                fitSize(lv.recipe.name, 7f * v.u, pw - 10 * v.u), 0xFF6B3F17, 0, Paint.Align.CENTER);
 
         if (v.won) {
             for (int s = 0; s < 3; s++) {
                 boolean on = s < v.stars;
-                gfx.star(c, o.centerX() + (s - 1) * pw * 0.22f, o.top + ph * 0.60f - (s == 1 ? 0 : pw * 0.02f), pw * 0.09f,
+                gfx.star(c, o.centerX() + (s - 1) * pw * 0.22f, o.top + ph * 0.20f - (s == 1 ? 0 : pw * 0.02f), pw * 0.09f,
                         on ? 0xFFFFD43B : 0xFFCDBFA0, on ? 0xFFC97700 : 0xFFA89878);
             }
-            String note = v.firstCook ? "New recipe in your book!" : !lv.lastStep() ? have + " of " + n + " ingredients ready" : v.stars == 3 ? "Perfect!" : "Fewer moves earns more stars";
-            gfx.textC(c, note, o.centerX(), o.top + ph * 0.70f, 4.6f * v.u, v.firstCook ? 0xFFD06A00 : 0xFF8B5A2B, 0, Paint.Align.CENTER);
+            if (v.recordScore) gfx.textC(c, "New best!  " + v.score, o.centerX(), o.top + ph * 0.55f,
+                    4.6f * v.u, 0xFFD06A00, 0, Paint.Align.CENTER);
         } else {
             gfx.textC(c, "Still missing", o.centerX(), o.top + ph * 0.60f, 4.6f * v.u, 0xFF8B5A2B, 0, Paint.Align.CENTER);
-        }
-        String scoreLine = v.recordScore ? "New best!  " + v.score
-                : "Score " + v.score + "   Best " + v.progress.bestScore[v.levelIndex];
-        gfx.textC(c, scoreLine, o.centerX(), o.top + ph * (v.won ? 0.765f : 0.69f), 4.2f * v.u,
-                v.recordScore ? 0xFFD06A00 : 0xFF8B5A2B, 0, Paint.Align.CENTER);
-        // the ingredients: all of them with those collected ticked, or just the one that fell short
-        float slot = Math.min(pw * 0.22f, (pw - 8 * v.u) / n), isz = slot * 0.5f, y = o.top + ph * (v.won ? 0.84f : 0.78f);
-        if (v.won) {
-            for (int i = 0; i < n; i++) {
-                float x = o.centerX() + (i - (n - 1) / 2f) * slot;
-                boolean done = v.progress.ingredientDone(lv.dish, i);
-                r.drawIcon(c, lv.recipe.ingredients[i], x, y - isz * 0.15f, isz, done ? 1f : 0.35f);
-                if (done) gfx.check(c, x + isz * 0.4f, y + isz * 0.3f, isz * 0.22f);
-                else gfx.textC(c, "Next", x, y + isz * 0.7f, isz * 0.38f, 0xFFB09A6C, 0, Paint.Align.CENTER);
-            }
-        } else {
+            if (v.recordScore) gfx.textC(c, "New best!  " + v.score, o.centerX(), o.top + ph * 0.69f,
+                    4.6f * v.u, 0xFFD06A00, 0, Paint.Align.CENTER);
             // every goal that fell short
             int missing = 0;
             for (int k : lv.goalKinds) if (v.need[k] > 0) missing++;
             int slot2 = 0;
+            float isz = pw * 0.08f, y = o.top + ph * 0.78f;
             for (int k : lv.goalKinds) {
                 if (v.need[k] <= 0) continue;
                 float x = o.centerX() + (slot2++ - (missing - 1) / 2f) * isz * 2.2f;

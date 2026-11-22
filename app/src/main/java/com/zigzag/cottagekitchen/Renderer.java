@@ -59,6 +59,7 @@ final class Renderer {
         if (v.screen == Screen.TITLE) drawTitle(c);
         else if (v.screen == Screen.RESULT) cook.drawResult(c);
         else if (v.screen == Screen.BOOK) cook.drawBook(c);
+        else if (v.screen == Screen.RECIPE) cook.drawRecipe(c);
         else drawPlay(c);
     }
 

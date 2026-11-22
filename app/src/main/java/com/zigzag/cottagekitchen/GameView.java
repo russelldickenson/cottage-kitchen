@@ -19,7 +19,10 @@ import java.util.Set;
 
 /** Owns the game state, runs the match-3 state machine and handles touch input. Drawing is in Renderer. */
 public class GameView extends View {
-    enum Screen {TITLE, BOOK, PLAY, RESULT}
+    enum Screen {TITLE, BOOK, RECIPE, PLAY, RESULT}
+
+    /** Room for future recipes with more ingredient levels than any dish has today. */
+    static final int MAX_STEPS = 12;
 
     static final int ICON_NONE = 0, ICON_CHEF = 1, ICON_NEXT = 2, ICON_REPLAY = 3;
     /** tipType value for the one-time "how to play" card, before any power-up tips. */
@@ -39,6 +42,8 @@ public class GameView extends View {
         int icon;
         /** Level index when this is a card on the recipe book, else -1. */
         int card = -1;
+        /** Step number when this is an ingredient node on the recipe screen, else -1. */
+        int recipeStep = -1;
         /** Hit area only: the screen draws it itself. */
         boolean hidden;
         Runnable act;
@@ -67,9 +72,16 @@ public class GameView extends View {
     /** The order card under the board: the dish and what it still needs. */
     final RectF kitchen = new RectF();
     final RectF boardPanel = new RectF(), tipBox = new RectF(), confirmBox = new RectF(), resultBox = new RectF();
-    /** One card per dish on the recipe book screen, which is also the level menu. */
+    /** One card per dish on the recipe book screen. */
     final RectF[] bookCard = new RectF[Recipes.ALL.length];
     int bookPressed = -1;
+    /** The recipe screen: the dish hero and one node per ingredient level. */
+    final RectF recipeDish = new RectF();
+    final RectF[] recipeNode = new RectF[MAX_STEPS];
+    int recipeStepCount, recipe, recipePressed = -1;
+    /** "Order up!" plays on the recipe screen when a dish's last ingredient is collected. */
+    boolean recipeCelebrate, showCelebration;
+    float celebrateT;
 
     // play state
     Screen screen = Screen.TITLE;
@@ -80,7 +92,7 @@ public class GameView extends View {
     int[] need = new int[Art.COUNT];
     int movesLeft, combo, stars, score;
     boolean recordScore;
-    boolean won, firstCook;
+    boolean won;
     float idleTime, clearTimer, time;
     /** Seconds since the level began: the "collect this" banner shows at the start. */
     float introT;
@@ -98,6 +110,7 @@ public class GameView extends View {
         sfx.enabled = progress.soundOn;
         renderer = new Renderer(ctx, this, gfx, fx);
         for (int i = 0; i < bookCard.length; i++) bookCard[i] = new RectF();
+        for (int i = 0; i < recipeNode.length; i++) recipeNode[i] = new RectF();
         setOnApplyWindowInsetsListener((v, insets) -> {
             topInset = insets.getSystemWindowInsetTop();
             botInset = insets.getSystemWindowInsetBottom();
@@ -139,6 +152,37 @@ public class GameView extends View {
         resultBox.set(W * 0.07f, topInset + m + hh + 8 * u, W * 0.93f, H - botInset - m - 13 * u - 4 * u);
         tipBox.set(W * 0.1f, H * 0.22f, W * 0.9f, H * 0.78f);
         confirmBox.set(W * 0.1f, H * 0.32f, W * 0.9f, H * 0.68f);
+        layoutRecipe();
+    }
+
+    /** Lays out the recipe screen: a dish hero and the dish's ingredient steps in wrapped rows. */
+    private void layoutRecipe() {
+        float m = 3 * u, hh = 13 * u;
+        float panelT = topInset + m + hh + 3 * u;
+        float panelB = H - botInset - m - 16 * u;
+        float availW = W - 2 * m, ph = Math.max(10 * u, panelB - panelT);
+        float dishSize = Math.min(availW * 0.42f, ph * 0.34f);
+        recipeDish.set(W / 2 - dishSize / 2, panelT, W / 2 + dishSize / 2, panelT + dishSize);
+
+        recipeStepCount = Recipes.ALL[recipe].ingredients.length;
+        float stepsTop = panelT + dishSize + 4 * u;
+        float stepsH = Math.max(4 * u, panelB - stepsTop);
+        int perRow = Math.min(recipeStepCount, 5);
+        int rows = (recipeStepCount + perRow - 1) / perRow;
+        float gap = 2 * u;
+        float cellW = (availW - (perRow - 1) * gap) / perRow;
+        float cellH = Math.min((stepsH - (rows - 1) * gap) / rows, cellW * 1.3f);
+        float rowsH = rows * cellH + (rows - 1) * gap;
+        float gridTop = stepsTop + Math.max(0, (stepsH - rowsH) * 0.25f);
+        for (RectF r : recipeNode) r.set(0, 0, 0, 0);
+        for (int i = 0; i < recipeStepCount; i++) {
+            int row = i / perRow, col = i % perRow;
+            int inRow = Math.min(perRow, recipeStepCount - row * perRow);
+            float rowW = inRow * cellW + (inRow - 1) * gap;
+            float l = W / 2 - rowW / 2 + col * (cellW + gap);
+            float t = gridTop + row * (cellH + gap);
+            recipeNode[i].set(l, t, l + cellW, t + cellH);
+        }
     }
 
     void buildButtons() {
@@ -172,10 +216,25 @@ public class GameView extends View {
                 float x = m + (i % 3) * (cw + gap), y = areaTop + (i / 3) * (ch + gap);
                 bookCard[i].set(x, y, x + cw, y + ch);
                 if (progress.recipeUnlocked(i)) {
-                    Button b = addHit(bookCard[i], () -> startLevel(Recipes.firstLevel(dish) + progress.nextStep(dish)));
+                    Button b = addHit(bookCard[i], () -> openRecipe(dish));
                     b.card = dish;
                 }
             }
+        } else if (screen == Screen.RECIPE) {
+            addBack(m, topInset + m, hh, this::goBook);
+            addSpeaker(W - m - hh, topInset + m, hh);
+            int next = progress.nextStep(recipe);
+            for (int i = 0; i < recipeStepCount; i++) {
+                if (i > next) continue;
+                final int step = i;
+                Button b = addHit(recipeNode[i], () -> startLevel(Recipes.firstLevel(recipe) + step));
+                b.recipeStep = step;
+            }
+            boolean cooked = progress.recipeDone(recipe);
+            String label = cooked ? "COOK AGAIN" : next > 0 ? "NEXT INGREDIENT" : "START COOKING";
+            Button b = addWide(W / 2, H - botInset - m - 8 * u, W * 0.6f, 13 * u, label, GREEN,
+                    () -> startLevel(Recipes.firstLevel(recipe) + (cooked ? 0 : next)));
+            b.icon = cooked ? ICON_REPLAY : next > 0 ? ICON_NEXT : ICON_CHEF;
         } else if (phase == Phase.TIP) {
             addWide(tipBox.centerX(), tipBox.top + tipBox.height() * 0.9f, tipBox.width() * 0.6f, tipBox.height() * 0.11f, "GOT IT!", GREEN, () -> {
                 if (tipType == TIP_INTRO) progress.introShown();
@@ -251,8 +310,12 @@ public class GameView extends View {
             goTitle();
             return true;
         }
-        if (screen == Screen.RESULT) {
+        if (screen == Screen.RECIPE) {
             goBook();
+            return true;
+        }
+        if (screen == Screen.RESULT) {
+            goRecipe();
             return true;
         }
         return false;
@@ -264,7 +327,7 @@ public class GameView extends View {
             confirmQuit = true;
             buildButtons();
         } else {
-            goBook();
+            goRecipe();
         }
     }
 
@@ -283,17 +346,23 @@ public class GameView extends View {
         float m = 3 * u, gap = 2.5f * u, h = 13 * u;
         float total = W - 2 * m, cy = H - botInset - m - h / 2;
         if (won) {
+            boolean last = level.lastStep();
             boolean hasNext = levelIndex + 1 < Level.COUNT;
-            float usable = total - 2 * gap, wR = usable * 0.36f, wN = usable * 0.34f, wM = usable * 0.30f;
-            addWide(m + wM / 2, cy, wM, h, "Recipes", BLUE, this::goBook);
-            addWide(m + wM + gap + wR / 2, cy, wR, h, "Replay", ORANGE, () -> startLevel(levelIndex)).icon = ICON_REPLAY;
-            Button next = addWide(m + wM + gap + wR + gap + wN / 2, cy, wN, h, hasNext ? "Next" : "DONE", GREEN,
-                    hasNext ? () -> startLevel(levelIndex + 1) : this::goBook);
-            if (hasNext) next.icon = ICON_NEXT;
+            float usable = total - 2 * gap, wP = usable * 0.30f, wR = usable * 0.34f, wN = usable * 0.36f;
+            addWide(m + wP / 2, cy, wP, h, "Recipe", BLUE, this::goRecipe);
+            addWide(m + wP + gap + wR / 2, cy, wR, h, "Replay", ORANGE, () -> startLevel(levelIndex)).icon = ICON_REPLAY;
+            Button next = addWide(m + wP + gap + wR + gap + wN / 2, cy, wN, h,
+                    last ? (hasNext ? "Next recipe" : "DONE") : "Next", GREEN,
+                    last ? () -> {
+                        if (hasNext) openRecipe(Recipes.dishOf(levelIndex + 1));
+                        else goBook();
+                    } : () -> startLevel(levelIndex + 1));
+            if (!last || hasNext) next.icon = ICON_NEXT;
         } else {
-            float usable = total - gap, wT = usable * 0.6f, wM = usable * 0.4f;
-            addWide(m + wT / 2, cy, wT, h, "TRY AGAIN", GREEN, () -> startLevel(levelIndex)).icon = ICON_REPLAY;
-            addWide(W - m - wM / 2, cy, wM, h, "BOOK", BLUE, this::goBook);
+            float usable = total - 2 * gap, wB = usable * 0.28f, wT = usable * 0.42f, wP = usable * 0.30f;
+            addWide(m + wB / 2, cy, wB, h, "Book", BLUE, this::goBook);
+            addWide(m + wB + gap + wT / 2, cy, wT, h, "TRY AGAIN", GREEN, () -> startLevel(levelIndex)).icon = ICON_REPLAY;
+            addWide(W - m - wP / 2, cy, wP, h, "Recipe", ORANGE, this::goRecipe);
         }
     }
 
@@ -304,15 +373,41 @@ public class GameView extends View {
 
     void goBook() {
         confirmQuit = false;
+        showCelebration = false;
         screen = Screen.BOOK;
         phase = Phase.IDLE;
+        buildButtons();
+    }
+
+    /** Opens a dish from the book: its ingredient levels are the group inside it. */
+    void openRecipe(int dish) {
+        recipe = dish;
+        showCelebration = false;
+        screen = Screen.RECIPE;
+        phase = Phase.IDLE;
+        layoutRecipe();
+        buildButtons();
+    }
+
+    /** Returns to the dish just played, showing the celebration once when it was completed. */
+    void goRecipe() {
+        recipe = level.dish;
+        showCelebration = recipeCelebrate;
+        recipeCelebrate = false;
+        celebrateT = 0;
+        screen = Screen.RECIPE;
+        phase = Phase.IDLE;
+        layoutRecipe();
         buildButtons();
     }
 
     void startLevel(int idx) {
         levelIndex = idx;
         confirmQuit = false;
+        showCelebration = false;
+        recipeCelebrate = false;
         level = Level.get(idx);
+        recipe = level.dish;
         board = new Board(COLS, ROWS, level.kinds, rnd);
         board.addCrates(level.crates(), rnd);
         need = new int[Art.COUNT];
@@ -345,9 +440,15 @@ public class GameView extends View {
         fx.update(dt, u);
         if (renderer.cook.update(dt) > 0) sfx.coin();
         bookPressed = -1;
+        recipePressed = -1;
         for (Button b : buttons) {
             if (b != downButton) b.pressed = false;
             else if (b.pressed && b.card >= 0) bookPressed = b.card;
+            else if (b.pressed && b.recipeStep >= 0) recipePressed = b.recipeStep;
+        }
+        if (showCelebration) {
+            celebrateT += dt;
+            if (celebrateT > 2.4f) showCelebration = false;
         }
         if (screen != Screen.PLAY || confirmQuit) return;
         introT += dt;
@@ -618,14 +719,14 @@ public class GameView extends View {
     private void endLevel(boolean win) {
         won = win;
         stars = win ? Rules.stars(movesLeft, level.moves) : 0;
-        firstCook = win && level.lastStep() && progress.bestStars[levelIndex] == 0;
         recordScore = score > progress.bestScore[levelIndex];
         progress.levelFinished(levelIndex, stars, score);
+        recipeCelebrate = win && level.lastStep();
         if (win) {
             sfx.win();
             phase = Phase.DONE;
             doneT = 0;
-            addPop(level.lastStep() ? level.recipe.name + " is ready!" : Recipes.INGREDIENT[level.ingredient()] + " collected!", W / 2, by + cell * 3f, cell * 0.8f, 1.4f, 0xFFFFD43B);
+            addPop(Recipes.INGREDIENT[level.ingredient()] + " collected!", W / 2, by + cell * 3f, cell * 0.8f, 1.4f, 0xFFFFD43B);
             buildButtons();
         } else {
             sfx.lose();
