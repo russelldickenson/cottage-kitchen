@@ -78,7 +78,8 @@ public class GameView extends View {
     int levelIndex;
     Board board;
     int[] need = new int[Art.COUNT];
-    int movesLeft, combo, stars;
+    int movesLeft, combo, stars, score;
+    boolean recordScore;
     boolean won, firstCook;
     float idleTime, clearTimer, time;
     /** Seconds since the level began: the "collect this" banner shows at the start. */
@@ -318,6 +319,8 @@ public class GameView extends View {
         for (int i = 0; i < level.goalKinds.length; i++) need[level.goalKinds[i]] = level.goalCounts[i];
         movesLeft = level.moves;
         combo = 0;
+        score = 0;
+        recordScore = false;
         introT = 0;
         selected = null;
         hint = null;
@@ -493,6 +496,7 @@ public class GameView extends View {
             if (first && combo > 1) addPop("Combo x" + combo + "!", W / 2, by + cell * 1.2f, cell * 0.8f, 1.1f, 0xFFFFD43B);
             first = false;
         }
+        score += seen.size() * 10 * combo;
         breakCrates(seen, 0f);
         if (!spawns.tiles.isEmpty()) addPop(spawns.types.get(0) == Art.GOLDEN_EGG || spawns.types.get(0) == Art.TRACTOR ? "Super Harvest!" : "Big Bang!",
                 W / 2, by + cell * 2.4f, cell * 0.85f, 1.2f, 0xFFFF9B26);
@@ -505,6 +509,7 @@ public class GameView extends View {
             t.dyDelay = delay;
             t.dying = true;
             dying.add(t);
+            score += 50;
             if (need[Art.CRATE] > 0) need[Art.CRATE]--;
         }
         for (Tile t : damaged) {
@@ -551,6 +556,7 @@ public class GameView extends View {
             }
             maxDelay = Math.max(maxDelay, d);
         }
+        score += list.size() * 10 * combo;
         breakCrates(set, maxDelay);
         act.dyDelay = maxDelay;
         sfx.powerUpPlayed(banner == null ? act.type : Art.TNT);
@@ -613,7 +619,8 @@ public class GameView extends View {
         won = win;
         stars = win ? Rules.stars(movesLeft, level.moves) : 0;
         firstCook = win && level.lastStep() && progress.bestStars[levelIndex] == 0;
-        progress.levelFinished(levelIndex, stars);
+        recordScore = score > progress.bestScore[levelIndex];
+        progress.levelFinished(levelIndex, stars, score);
         if (win) {
             sfx.win();
             phase = Phase.DONE;

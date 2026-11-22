@@ -3,12 +3,13 @@ package com.zigzag.cottagekitchen;
 import android.content.Context;
 import android.content.SharedPreferences;
 
-/** Everything that survives between sessions: how far the player has got, the best stars per dish, sound and tutorial cards seen. */
+/** Everything that survives between sessions: how far the player has got, best stars and score per level, sound and tutorial cards seen. */
 final class Progress {
     int unlocked;
     boolean soundOn;
     boolean introSeen;
     final int[] bestStars = new int[Level.COUNT];
+    final int[] bestScore = new int[Level.COUNT];
     final boolean[] tipSeen = new boolean[Art.COUNT];
     private final SharedPreferences prefs;
 
@@ -18,7 +19,10 @@ final class Progress {
         soundOn = prefs.getBoolean("sound", true);
         introSeen = prefs.getBoolean("intro", false);
         for (int t = Art.CROPS; t < Art.COUNT; t++) tipSeen[t] = prefs.getBoolean("tip_" + t, false);
-        for (int i = 0; i < Level.COUNT; i++) bestStars[i] = prefs.getInt("stars_" + i, 0);
+        for (int i = 0; i < Level.COUNT; i++) {
+            bestStars[i] = prefs.getInt("stars_" + i, 0);
+            bestScore[i] = prefs.getInt("score_" + i, 0);
+        }
     }
 
     /** A dish is open once the one before it has been cooked (all its ingredients collected). */
@@ -48,12 +52,17 @@ final class Progress {
         return n - 1;
     }
 
-    /** Records a finished level. stars is 0 for a loss. */
-    void levelFinished(int levelIndex, int stars) {
-        if (stars == 0) return;
+    /** Records a finished level. stars is 0 for a loss, but the score still counts. */
+    void levelFinished(int levelIndex, int stars, int score) {
+        bestScore[levelIndex] = Math.max(bestScore[levelIndex], score);
+        SharedPreferences.Editor edit = prefs.edit().putInt("score_" + levelIndex, bestScore[levelIndex]);
+        if (stars == 0) {
+            edit.apply();
+            return;
+        }
         bestStars[levelIndex] = Math.max(bestStars[levelIndex], stars);
         unlocked = Math.max(unlocked, Math.min(Level.COUNT, levelIndex + 2));
-        prefs.edit().putInt("unlocked", unlocked).putInt("stars_" + levelIndex, bestStars[levelIndex]).apply();
+        edit.putInt("unlocked", unlocked).putInt("stars_" + levelIndex, bestStars[levelIndex]).apply();
     }
 
     void setSound(boolean on) {

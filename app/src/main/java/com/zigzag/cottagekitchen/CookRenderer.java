@@ -269,6 +269,10 @@ final class CookRenderer {
         } else {
             gfx.textC(c, "Still missing", o.centerX(), o.top + ph * 0.60f, 4.6f * v.u, 0xFF8B5A2B, 0, Paint.Align.CENTER);
         }
+        String scoreLine = v.recordScore ? "New best!  " + v.score
+                : "Score " + v.score + "   Best " + v.progress.bestScore[v.levelIndex];
+        gfx.textC(c, scoreLine, o.centerX(), o.top + ph * (v.won ? 0.765f : 0.69f), 4.2f * v.u,
+                v.recordScore ? 0xFFD06A00 : 0xFF8B5A2B, 0, Paint.Align.CENTER);
         // the ingredients: all of them with those collected ticked, or just the one that fell short
         float slot = Math.min(pw * 0.22f, (pw - 8 * v.u) / n), isz = slot * 0.5f, y = o.top + ph * (v.won ? 0.84f : 0.78f);
         if (v.won) {
