@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="560" viewBox="0 0 1200 560" role="img" aria-labelledby="howTitle howDesc">
+  <title id="howTitle">How to play Cottage Kitchen</title>
+  <desc id="howDesc">A seven by eight board of smiling ingredient tiles with three berries matched in a row, beside four steps: swap two neighbours, match three or more, beat the move budget, and earn up to three stars.</desc>
+
+  <defs>
+    <g id="small-tile">
+      <circle r="14" stroke="#5A3410" stroke-width="2.5"/>
+      <ellipse cx="-5" cy="-7" rx="4.5" ry="2.5" fill="#FFFFFF" opacity="0.55"/>
+      <circle cx="-5" cy="-2" r="2" fill="#5A3410"/>
+      <circle cx="5" cy="-2" r="2" fill="#5A3410"/>
+      <path d="M-4 3 Q0 8 4 3" fill="none" stroke="#5A3410" stroke-width="2" stroke-linecap="round"/>
+    </g>
+  </defs>
+
+  <rect width="1200" height="560" rx="28" fill="#FFF4D2"/>
+
+  <g id="heading" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <text x="60" y="86" font-size="46" font-weight="900" fill="#5A3410">How to play</text>
+    <text x="60" y="122" font-size="23" font-weight="600" fill="#8B5A2B">One recipe at a time — from the first strawberry to the last crumb.</text>
+  </g>
+
+  <g id="board">
+    <rect x="60" y="160" width="430" height="330" rx="20" fill="#6B3F17" stroke="#5A3410" stroke-width="4"/>
+    <rect x="72" y="172" width="406" height="306" rx="12" fill="#FFFAEC"/>
+    <g id="tiles">
+      <g transform="translate(101 191)"><use xlink:href="#small-tile" href="#small-tile" fill="#FFC928"/></g>
+      <g transform="translate(159 191)"><use xlink:href="#small-tile" href="#small-tile" fill="#75C260"/></g>
+      <g transform="translate(217 191)"><use xlink:href="#small-tile" href="#small-tile" fill="#3FA9F5"/></g>
+      <g transform="translate(275 191)"><use xlink:href="#small-tile" href="#small-tile" fill="#E53B4F"/></g>
+      <g transform="translate(333 191)"><use xlink:href="#small-tile" href="#small-tile" fill="#FF9B26"/></g>
+      <g transform="translate(391 191)"><use xlink:href="#small-tile" href="#small-tile" fill="#FFF8E8"/></g>
+      <g transform="translate(449 191)"><use xlink:href="#small-tile" href="#small-tile" fill="#75C260"/></g>
+
+      <g transform="translate(101 229)"><use xlink:href="#small-tile" href="#small-tile" fill="#3FA9F5"/></g>
+      <g transform="translate(159 229)"><use xlink:href="#small-tile" href="#small-tile" fill="#E53B4F"/></g>
+      <g transform="translate(217 229)"><use xlink:href="#small-tile" href="#small-tile" fill="#FF9B26"/></g>
+      <g transform="translate(275 229)"><use xlink:href="#small-tile" href="#small-tile" fill="#FFC928"/></g>
+      <g transform="translate(333 229)"><use xlink:href="#small-tile" href="#small-tile" fill="#75C260"/></g>
+      <g transform="translate(391 229)"><use xlink:href="#small-tile" href="#small-tile" fill="#E53B4F"/></g>
+      <g transform="translate(449 229)"><use xlink:href="#small-tile" href="#small-tile" fill="#FFF8E8"/></g>
+
+      <g transform="translate(101 268)"><use xlink:href="#small-tile" href="#small-tile" fill="#75C260"/></g>
+      <g transform="translate(159 268)"><use xlink:href="#small-tile" href="#small-tile" fill="#FFF8E8"/></g>
+      <g transform="translate(217 268)"><use xlink:href="#small-tile" href="#small-tile" fill="#FF9B26"/></g>
+      <g transform="translate(275 268)"><use xlink:href="#small-tile" href="#small-tile" fill="#3FA9F5"/></g>
+      <g transform="translate(333 268)"><use xlink:href="#small-tile" href="#small-tile" fill="#FFC928"/></g>
+      <g transform="translate(391 268)"><use xlink:href="#small-tile" href="#small-tile" fill="#75C260"/></g>
+      <g transform="translate(449 268)"><use xlink:href="#small-tile" href="#small-tile" fill="#E53B4F"/></g>
+
+      <g transform="translate(101 306)"><use xlink:href="#small-tile" href="#small-tile" fill="#FFC928"/></g>
+      <g transform="translate(159 306)"><use xlink:href="#small-tile" href="#small-tile" fill="#E53B4F"/></g>
+      <g transform="translate(217 306)"><use xlink:href="#small-tile" href="#small-tile" fill="#75C260"/></g>
+      <g transform="translate(275 306)"><use xlink:href="#small-tile" href="#small-tile" fill="#FFF8E8"/></g>
+      <g transform="translate(333 306)"><use xlink:href="#small-tile" href="#small-tile" fill="#FF9B26"/></g>
+      <g transform="translate(391 306)"><use xlink:href="#small-tile" href="#small-tile" fill="#3FA9F5"/></g>
+      <g transform="translate(449 306)"><use xlink:href="#small-tile" href="#small-tile" fill="#FFC928"/></g>
+
+      <g transform="translate(101 344)"><use xlink:href="#small-tile" href="#small-tile" fill="#3FA9F5"/></g>
+      <g transform="translate(159 344)"><use xlink:href="#small-tile" href="#small-tile" fill="#E53B4F"/></g>
+      <g transform="translate(217 344)"><use xlink:href="#small-tile" href="#small-tile" fill="#E53B4F"/></g>
+      <g transform="translate(275 344)"><use xlink:href="#small-tile" href="#small-tile" fill="#E53B4F"/></g>
+      <g transform="translate(333 344)"><use xlink:href="#small-tile" href="#small-tile" fill="#75C260"/></g>
+      <g transform="translate(391 344)"><use xlink:href="#small-tile" href="#small-tile" fill="#FF9B26"/></g>
+      <g transform="translate(449 344)"><use xlink:href="#small-tile" href="#small-tile" fill="#FFF8E8"/></g>
+
+      <g transform="translate(101 383)"><use xlink:href="#small-tile" href="#small-tile" fill="#FF9B26"/></g>
+      <g transform="translate(159 383)"><use xlink:href="#small-tile" href="#small-tile" fill="#75C260"/></g>
+      <g transform="translate(217 383)"><use xlink:href="#small-tile" href="#small-tile" fill="#FFC928"/></g>
+      <g transform="translate(275 383)"><use xlink:href="#small-tile" href="#small-tile" fill="#3FA9F5"/></g>
+      <g transform="translate(333 383)"><use xlink:href="#small-tile" href="#small-tile" fill="#E53B4F"/></g>
+      <g transform="translate(391 383)"><use xlink:href="#small-tile" href="#small-tile" fill="#FFF8E8"/></g>
+      <g transform="translate(449 383)"><use xlink:href="#small-tile" href="#small-tile" fill="#FF9B26"/></g>
+
+      <g transform="translate(101 421)"><use xlink:href="#small-tile" href="#small-tile" fill="#FFF8E8"/></g>
+      <g transform="translate(159 421)"><use xlink:href="#small-tile" href="#small-tile" fill="#FF9B26"/></g>
+      <g transform="translate(217 421)"><use xlink:href="#small-tile" href="#small-tile" fill="#3FA9F5"/></g>
+      <g transform="translate(275 421)"><use xlink:href="#small-tile" href="#small-tile" fill="#75C260"/></g>
+      <g transform="translate(333 421)"><use xlink:href="#small-tile" href="#small-tile" fill="#FFC928"/></g>
+      <g transform="translate(391 421)"><use xlink:href="#small-tile" href="#small-tile" fill="#E53B4F"/></g>
+      <g transform="translate(449 421)"><use xlink:href="#small-tile" href="#small-tile" fill="#75C260"/></g>
+
+      <g transform="translate(101 459)"><use xlink:href="#small-tile" href="#small-tile" fill="#75C260"/></g>
+      <g transform="translate(159 459)"><use xlink:href="#small-tile" href="#small-tile" fill="#E53B4F"/></g>
+      <g transform="translate(217 459)"><use xlink:href="#small-tile" href="#small-tile" fill="#FFC928"/></g>
+      <g transform="translate(275 459)"><use xlink:href="#small-tile" href="#small-tile" fill="#FFF8E8"/></g>
+      <g transform="translate(333 459)"><use xlink:href="#small-tile" href="#small-tile" fill="#3FA9F5"/></g>
+      <g transform="translate(391 459)"><use xlink:href="#small-tile" href="#small-tile" fill="#FF9B26"/></g>
+      <g transform="translate(449 459)"><use xlink:href="#small-tile" href="#small-tile" fill="#FFC928"/></g>
+    </g>
+    <rect x="141" y="325" width="152" height="38" rx="12" fill="none" stroke="#FFC928" stroke-width="4" stroke-dasharray="9 6"/>
+    <path d="M345 287 Q362 269 380 287" fill="none" stroke="#5A3410" stroke-width="3" stroke-linecap="round"/>
+    <polygon points="374,281 385,287 373,294" fill="#5A3410"/>
+  </g>
+  <text x="275" y="522" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="21" font-weight="700" fill="#8B5A2B">7 × 8 board · 15 ingredients · no timer</text>
+
+  <g id="steps" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <g>
+      <circle cx="572" cy="190" r="22" fill="#75C260" stroke="#5A3410" stroke-width="3"/>
+      <text x="572" y="198" text-anchor="middle" font-size="24" font-weight="900" fill="#5A3410">1</text>
+      <text x="612" y="184" font-size="30" font-weight="800" fill="#5A3410">Swap two neighbours</text>
+      <text x="612" y="215" font-size="21" font-weight="600" fill="#6B3F17">Tap or drag a tile onto the one beside it.</text>
+    </g>
+    <g>
+      <circle cx="572" cy="284" r="22" fill="#FF9B26" stroke="#5A3410" stroke-width="3"/>
+      <text x="572" y="292" text-anchor="middle" font-size="24" font-weight="900" fill="#5A3410">2</text>
+      <text x="612" y="278" font-size="30" font-weight="800" fill="#5A3410">Match three or more</text>
+      <text x="612" y="309" font-size="21" font-weight="600" fill="#6B3F17">Line up ingredients to harvest them into the order.</text>
+    </g>
+    <g>
+      <circle cx="572" cy="378" r="22" fill="#3FA9F5" stroke="#5A3410" stroke-width="3"/>
+      <text x="572" y="386" text-anchor="middle" font-size="24" font-weight="900" fill="#5A3410">3</text>
+      <text x="612" y="372" font-size="30" font-weight="800" fill="#5A3410">Beat the move budget</text>
+      <text x="612" y="403" font-size="21" font-weight="600" fill="#6B3F17">Finish the order before your moves run out.</text>
+    </g>
+    <g>
+      <circle cx="572" cy="472" r="22" fill="#FFC928" stroke="#5A3410" stroke-width="3"/>
+      <text x="572" y="480" text-anchor="middle" font-size="24" font-weight="900" fill="#5A3410">4</text>
+      <text x="612" y="466" font-size="30" font-weight="800" fill="#5A3410">Earn up to three stars</text>
+      <text x="612" y="497" font-size="21" font-weight="600" fill="#6B3F17">Unlock the next dish and chase a new best score.</text>
+    </g>
+  </g>
+</svg>
