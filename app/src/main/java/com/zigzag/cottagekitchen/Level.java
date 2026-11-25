@@ -7,21 +7,22 @@ package com.zigzag.cottagekitchen;
 final class Level {
     static final int COUNT = Recipes.LEVELS;
 
-    /** Power-up tiles (Golden Egg, Tractor, TNT, Scarecrow) only appear from this level number. */
-    static final int POWER_UP_LEVEL = 12;
-
     /** From this level number, the later ingredients of a dish also ask for one earlier ingredient of the same dish. */
     static final int MULTI_LEVEL = 16;
 
     /** From this level number, every other multi-goal level asks for crates to be broken instead of a second ingredient. */
     static final int CRATE_LEVEL = 20;
 
-    /** Move budgets, produced by tools/sim/run.sh (tune) from how fast an expert bot collects each order. */
+    /**
+     * Move budgets. The first eleven are unchanged; the rest were re-tuned with
+     * tools/sim/run.sh (tune) after power-ups were removed, so the later orders
+     * keep roughly their original difficulty without a shortcut tile.
+     */
     private static final int[] MOVES = {
-            11, 11, 11, 12, 12, 11, 12, 12, 12, 12, 12, 11, 11, 12, 12,
-            13, 13, 16, 13, 14, 14, 14, 15, 15, 15, 15, 15, 17, 17, 16,
-            19, 18, 18, 16, 20, 18, 19, 17, 20, 18, 19, 18, 20, 17, 21,
-            18, 20, 19, 20};
+            11, 11, 11, 12, 12, 11, 12, 12, 12, 12, 12, 13, 13, 14, 14,
+            15, 15, 16, 15, 17, 19, 17, 16, 18, 20, 18, 18, 18, 22, 19,
+            22, 19, 21, 20, 22, 21, 24, 19, 23, 21, 26, 21, 26, 22, 27,
+            21, 26, 23, 26};
 
     /** Position in the book, then the ingredient within the dish. */
     final int number, dish, step;
@@ -40,10 +41,6 @@ final class Level {
         this.goalKinds = goalKinds;
         this.goalCounts = goalCounts;
         this.moves = moves;
-    }
-
-    boolean powerUps() {
-        return number >= POWER_UP_LEVEL;
     }
 
     /** The ingredient this level is named for; any further goals are earlier ingredients of the same dish. */

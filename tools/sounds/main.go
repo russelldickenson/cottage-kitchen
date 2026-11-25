@@ -134,42 +134,6 @@ func main() {
 	b.add(tone(0.25, 2093, 2093, 16, 0.3), 0.07, 1)
 	write(dir, "sfx_coin", b)
 
-	// special tile created / tip: rising sparkle arpeggio
-	b = newBuf(0.6)
-	for i, n := range []int{12, 16, 19, 24} {
-		b.add(tone(0.35, note(n), note(n), 9, 0.4, 0.2), float64(i)*0.08, 0.8)
-	}
-	write(dir, "sfx_special", b)
-
-	// boom: thump + noise burst
-	b = newBuf(0.75)
-	b.add(tone(0.75, 95, 40, 5), 0, 1)
-	b.add(noise(0.75, 6, 0.18, rng), 0, 1.4)
-	write(dir, "sfx_boom", b)
-
-	// golden egg: magical upward glissando with shimmer
-	b = newBuf(0.8)
-	b.add(tone(0.8, 500, 2400, 3.2, 0.35, 0.2), 0, 1)
-	for i := 0; i < 8; i++ {
-		b.add(tone(0.25, 1800+float64(i)*260, 1800+float64(i)*260, 12), 0.1+float64(i)*0.07, 0.35)
-	}
-	write(dir, "sfx_magic", b)
-
-	// tractor: chugging engine that revs up, with a horn at the end
-	b = newBuf(0.9)
-	phase := 0.0
-	for i := range b {
-		t := float64(i) / rate
-		f := 52 + 40*t
-		phase += 2 * math.Pi * f / rate
-		saw := 2*(phase/(2*math.Pi)-math.Floor(phase/(2*math.Pi)+0.5)) // sawtooth
-		chug := 0.55 + 0.45*math.Sin(2*math.Pi*(11+8*t)*t)
-		b[i] = saw * chug * 0.6 * math.Exp(-1.3*t)
-	}
-	b.add(noise(0.9, 3, 0.1, rng), 0, 0.35)
-	b.add(tone(0.28, note(7), note(7), 4, 0.5, 0.3), 0.55, 0.45)
-	write(dir, "sfx_tractor", b)
-
 	// win: fanfare
 	b = newBuf(1.5)
 	for i, n := range []int{0, 4, 7, 12} {

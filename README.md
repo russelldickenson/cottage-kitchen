@@ -26,16 +26,8 @@ Every dish is cooked one ingredient at a time. Progress shows up right on its re
 - Match three or more in a row to collect that ingredient for the current order. Cascades build combos and multiply the score.
 - Collect everything on the order before the moves run out. There is no timer: only the move budget puts on the pressure.
 - Finish with moves to spare for one to three stars. Stars unlock the next level and, along with your best score, are saved on the device.
-- From level 12, matching five in a row or making an L/T shape creates a power-up. Tap a tip card the first time you meet one.
 - From level 20, some orders include crates. They cannot be swapped; clear tiles beside them twice to break them.
 - Idle for six seconds and a hint appears. A board with no legal moves reshuffles itself.
-
-| Power-up | Made by | When swapped with a crop |
-| --- | --- | --- |
-| <img src="./app/src/main/res/drawable-nodpi/crop_egg_gold.png" width="48" alt="Golden Egg"> **Golden Egg** | Five in a row | Beams clear every tile of that crop |
-| <img src="./app/src/main/res/drawable-nodpi/crop_tractor.png" width="48" alt="Tractor"> **Tractor** | Five in a row | Sweeps across, clearing every tile of that crop |
-| <img src="./app/src/main/res/drawable-nodpi/crop_tnt.png" width="48" alt="TNT"> **TNT** | L or T shaped match | Explodes the surrounding 3 × 3 |
-| <img src="./app/src/main/res/drawable-nodpi/crop_scarecrow.png" width="48" alt="Scarecrow"> **Scarecrow** | L or T shaped match | Sweeps the surrounding 3 × 3 |
 
 The whole game is one Android `View` drawing with `Canvas`: no game engine, no XML layouts, no AndroidX, and no third-party libraries. Art and sound effects are bundled locally, and progress lives in `SharedPreferences`.
 

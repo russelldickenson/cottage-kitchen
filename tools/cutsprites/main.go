@@ -34,10 +34,6 @@ var specs = []spec{
 	{"water", "sheet1", image.Rect(840, 295, 1024, 515)},
 	{"pumpkin", "sheet2", image.Rect(20, 50, 235, 260)},
 	{"watermelon", "sheet2", image.Rect(600, 300, 830, 510)},
-	{"scarecrow", "specials", image.Rect(10, 95, 290, 475)},
-	{"tnt", "specials", image.Rect(295, 110, 480, 445)},
-	{"egg_gold", "specials", image.Rect(485, 160, 700, 450)},
-	{"tractor", "specials", image.Rect(700, 150, 1015, 465)},
 }
 
 func load(p string) image.Image {
@@ -63,7 +59,6 @@ func main() {
 		"sheet1":    load("tools/sprites/sheet1.png"),
 		"sheet2":    load("tools/sprites/sheet2.png"),
 		"blueberry": load("tools/sprites/blueberry.png"),
-		"specials":  load("tools/sprites/specials.png"),
 	}
 	dst := "app/src/main/res/drawable-nodpi"
 	for _, s := range specs {

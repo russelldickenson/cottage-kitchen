@@ -216,12 +216,8 @@ final class Renderer {
                     if (t == v.selected) extra = 1f + 0.07f * (float) Math.sin(v.time * 12);
                     else if (v.hint != null && ((t.r == v.hint[0] && t.c == v.hint[1]) || (t.r == v.hint[2] && t.c == v.hint[3])))
                         extra = 1f + 0.1f * (float) Math.sin(v.time * 8);
-                    if (t != v.fxTile) drawTile(c, t, extra);
+                    drawTile(c, t, extra);
                 }
-            }
-            if (v.fxTile != null && v.phase == Phase.CLEAR) {
-                drawFx(c);
-                drawTile(c, v.fxTile, 1f);
             }
             c.restore();
         }
@@ -294,101 +290,22 @@ final class Renderer {
 
     private void drawTile(Canvas c, Tile t, float extra) {
         float x = v.cx(t), y = v.cy(t);
-        boolean fx = t == v.fxTile && v.phase == Phase.CLEAR;
-        float rot = 0, mult = 1f, ox = 0, oy = 0;
-        if (fx) {
-            float k = v.clearTimer;
-            switch (t.type) {
-                case Art.SCARECROW:
-                    rot = k * 1000f;
-                    mult = 1.5f;
-                    break;
-                case Art.TNT:
-                    mult = 1f + 0.6f * Math.min(1f, k * 4f);
-                    ox = (float) Math.sin(k * 70) * v.cell * 0.03f;
-                    break;
-                case Art.GOLDEN_EGG:
-                    mult = 1.4f + 0.1f * (float) Math.sin(k * 20);
-                    gfx.circle(c, x, y, v.cell * (0.7f + 0.2f * (float) Math.sin(k * 18)), 0x66FFE066);
-                    break;
-                case Art.TRACTOR:
-                    if (k > 0.15f) return; // the tractor itself is driving across the v.board
-                    mult = 1f + k * 2f;
-                    break;
-            }
-        }
-        float size = v.cell * 0.92f * t.scale * extra * mult;
+        float size = v.cell * 0.92f * t.scale * extra;
         float w = size * (1f + 0.12f * t.squash), h = size * (1f - 0.18f * t.squash);
-        float bottom = y + oy + size / 2;
-        if (!fx) gfx.ellipse(c, x, y + v.cell * 0.38f, v.cell * 0.3f * t.scale, v.cell * 0.06f * t.scale, 0x26000000);
+        float bottom = y + size / 2;
+        gfx.ellipse(c, x, y + v.cell * 0.38f, v.cell * 0.3f * t.scale, v.cell * 0.06f * t.scale, 0x26000000);
         Bitmap b = art[t.type == Art.CRATE && t.hp < Art.CRATE_HP ? Art.CRATE_CRACKED : t.type];
         src.set(0, 0, b.getWidth(), b.getHeight());
-        dst.set(x + ox - w / 2, bottom - h, x + ox + w / 2, bottom);
-        c.save();
-        if (rot != 0) c.rotate(rot, x + ox, y + oy);
+        dst.set(x - w / 2, bottom - h, x + w / 2, bottom);
         c.drawBitmap(b, src, dst, bmp);
-        c.restore();
     }
 
-    /** Effects around the power-up that is currently being played. */
-    private void drawFx(Canvas c) {
-        float x = v.cx(v.fxTile), y = v.cy(v.fxTile), k = v.clearTimer;
-        switch (v.fxTile.type) {
-            case Art.GOLDEN_EGG:
-                for (Tile t : v.dying) {
-                    if (t == v.fxTile) continue;
-                    float a = 1f - (k - t.dyDelay) / 0.3f;
-                    if (k >= t.dyDelay - 0.05f && a > 0f)
-                        gfx.beam(c, x, y, v.cx(t), v.cy(t), v.cell * 0.14f * Math.min(1f, a), Gfx.alpha(0xFFFFD43B, Math.min(1f, a)));
-                }
-                gfx.circle(c, x, y, v.cell * (0.6f + k * 3f), Gfx.alpha(0xFFFFF3B0, Math.max(0f, 0.45f - k)));
-                break;
-            case Art.TNT: {
-                float a = Math.max(0f, 1f - k * 2.5f);
-                float rad = v.cell * (0.4f + k * 9f);
-                gfx.circle(c, x, y, rad * 0.85f, Gfx.alpha(0xFFFFE08A, a * 0.55f));
-                gfx.circleLine(c, x, y, rad, v.cell * 0.22f * a, Gfx.alpha(0xFFFF7A00, a));
-                break;
-            }
-            case Art.SCARECROW: {
-                float a = Math.max(0f, 1f - k * 2f);
-                for (int i = 0; i < 10; i++) {
-                    double ang = k * 14 + i * Math.PI / 5;
-                    float rr = v.cell * (0.5f + k * 5f);
-                    gfx.star(c, x + (float) Math.cos(ang) * rr, y + (float) Math.sin(ang) * rr, v.cell * 0.14f, Gfx.alpha(0xFFFFD25A, a), 0);
-                }
-                break;
-            }
-            case Art.TRACTOR: {
-                float tx = v.bx - v.cell * 0.5f + (k / 0.08f) * v.cell;
-                if (tx < v.bx + v.cell * (COLS + 1)) {
-                    float size = v.cell * 1.5f;
-                    Bitmap b = art[Art.TRACTOR];
-                    src.set(0, 0, b.getWidth(), b.getHeight());
-                    float bob = (float) Math.sin(k * 40) * v.cell * 0.02f;
-                    dst.set(tx - size / 2, y + v.cell * 0.45f - size + bob, tx + size / 2, y + v.cell * 0.45f + bob);
-                    gfx.ellipse(c, tx, y + v.cell * 0.45f, size * 0.4f, v.cell * 0.07f, 0x30000000);
-                    c.drawBitmap(b, src, dst, bmp);
-                }
-                break;
-            }
-        }
-    }
-
-    private static final String[] TIP_NAME = {"Scarecrow", "TNT", "Golden Egg", "Rainbow Tractor", "Crate"};
+    private static final String[] TIP_NAME = {"Crate"};
     private static final String[] TIP_USE = {
-            "Swap it with a neighbour and it spins, sweeping away the 3x3 area around it.",
-            "Swap it with a neighbour to blow up the 3x3 area around it.",
-            "Swap it with any crop to harvest every one of that crop on the board.",
-            "Swap it with any crop and it drives across the board, harvesting every one of that crop.",
             "Crates can not be swapped. Match crops right beside one to crack it, and again to break it.",
     };
     private static final String[] TIP_MAKE = {
-            "Make one by matching a T or L shape.",
-            "Make one by matching a T or L shape.",
-            "Make one by matching 5 in a row.",
-            "Make one by matching 5 in a row.",
-            "Power-ups beside a crate hit it too.",
+            "Each match beside a crate deals one hit.",
     };
 
     List<String> wrap(String text, float size, float maxW) {
@@ -419,8 +336,7 @@ final class Renderer {
         gfx.rrect(c, o.left, o.top, o.right, o.bottom, 6 * v.u, WOOD);
         gfx.rrect(c, o.left + v.u, o.top + v.u, o.right - v.u, o.bottom - v.u, 5 * v.u, CREAM);
         gfx.rrect(c, o.left - v.u, o.top - 3 * v.u, o.right + v.u, o.top + ph * 0.14f, 5 * v.u, ORANGE);
-        String heading = v.tipType == GameView.TIP_INTRO ? "How to Play"
-                : v.tipType == Art.CRATE ? "New Obstacle!" : "New Power-Up!";
+        String heading = v.tipType == GameView.TIP_INTRO ? "How to Play" : "New Obstacle!";
         gfx.textC(c, heading, o.centerX(), o.top + ph * 0.045f, 7 * v.u, Color.WHITE, 0xFF7A3E0B, Paint.Align.CENTER);
 
         float iy = o.top + ph * 0.30f;

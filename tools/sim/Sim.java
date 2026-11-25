@@ -10,10 +10,6 @@ import java.util.*;
 public class Sim {
     static final int COLS = Rules.COLS, ROWS = Rules.ROWS;
     static final Random rnd = new Random(42);
-    static int madeByMove, madeByCascade, activated;
-    static boolean counting;
-    static boolean powerUpsOn = true;
-    static final boolean NO_SPECIALS = Boolean.getBoolean("nospecials");
 
     static final class State {
         int[] need = new int[Art.COUNT];
@@ -46,7 +42,6 @@ public class Sim {
     static boolean valid(Board b, int[] m) {
         Tile a = b.g[m[0]][m[1]], t = b.g[m[2]][m[3]];
         if (Art.isCrate(a.type) || Art.isCrate(t.type)) return false;
-        if (Art.isSpecial(a.type) || Art.isSpecial(t.type)) return true;
         b.swap(m[0], m[1], m[2], m[3]);
         boolean ok = !b.findRuns().isEmpty();
         b.swap(m[0], m[1], m[2], m[3]);
@@ -67,27 +62,18 @@ public class Sim {
 
     /** Applies one player move. Returns goal progress (higher is better), or -1 if the move is illegal. */
     static double play(Board b, State s, int[] m, boolean full) {
-        Tile a = b.g[m[0]][m[1]], t2 = b.g[m[2]][m[3]];
         b.swap(m[0], m[1], m[2], m[3]);
-        Set<Tile> counted = new LinkedHashSet<>(), clear;
-        List<Tile> spT = new ArrayList<>();
-        List<Integer> spTy = new ArrayList<>();
-        int combo = 1;
-        if (Art.isSpecial(a.type) || Art.isSpecial(t2.type)) {
-            clear = Rules.specialClearSet(b, a, t2);
-            if (counting) activated++;
-            counted.addAll(clear);
-        } else {
-            List<Board.Run> runs = b.findRuns();
-            if (runs.isEmpty()) {
-                b.swap(m[0], m[1], m[2], m[3]);
-                return -1;
-            }
-            clear = fromRuns(runs, a, t2, counted, spT, spTy);
+        List<Board.Run> runs = b.findRuns();
+        if (runs.isEmpty()) {
+            b.swap(m[0], m[1], m[2], m[3]);
+            return -1;
         }
         s.moves--;
         double gain = 0;
+        Set<Tile> counted = new LinkedHashSet<>();
         while (true) {
+            for (Board.Run run : runs) counted.addAll(run.tiles);
+            Set<Tile> clear = new LinkedHashSet<>(counted);
             List<Tile> damaged = new ArrayList<>();
             List<Tile> broken = Rules.hitCrates(b, counted, damaged);
             gain += damaged.size();
@@ -95,7 +81,6 @@ public class Sim {
                 if (s.need[Art.CRATE] > 0) s.need[Art.CRATE]--;
                 gain += 3;
             }
-            counted.removeIf(t -> Art.isCrate(t.type));
             clear.removeIf(t -> Art.isCrate(t.type));
             clear.addAll(broken);
             for (Tile t : counted) {
@@ -104,40 +89,18 @@ public class Sim {
                     gain += 1;
                 } else gain += 0.1;
             }
-            gain += 2 * spT.size();
             for (Tile t : clear) b.g[t.r][t.c] = null;
-            for (int i = 0; i < spT.size(); i++) spT.get(i).type = spTy.get(i);
             b.collapse();
             if (!full) return gain;
-            List<Board.Run> runs = b.findRuns();
+            runs = b.findRuns();
             if (runs.isEmpty()) break;
-            combo++;
             counted = new LinkedHashSet<>();
-            spT = new ArrayList<>();
-            spTy = new ArrayList<>();
-            clear = fromRuns(runs, null, null, counted, spT, spTy);
         }
         return gain;
     }
 
-    static Set<Tile> fromRuns(List<Board.Run> runs, Tile sa, Tile sb, Set<Tile> counted, List<Tile> spT, List<Integer> spTy) {
-        Rules.Spawns sp = Rules.findSpawns(runs, sa, sb, rnd);
-        for (int i = 0; i < sp.tiles.size(); i++) {
-            if (NO_SPECIALS || !powerUpsOn) break;
-            spT.add(sp.tiles.get(i));
-            spTy.add(sp.types.get(i));
-            if (counting && sa == null && sb == null) madeByCascade++;
-            else if (counting) madeByMove++;
-        }
-        for (Board.Run run : runs) counted.addAll(run.tiles);
-        Set<Tile> clear = new LinkedHashSet<>(counted);
-        clear.removeAll(spT);
-        return clear;
-    }
-
     /** Plays one level. Returns the moves left, or -1 on a loss. */
     static int playLevel(Level lv, double skill) {
-        powerUpsOn = lv.powerUps();
         Board b = new Board(COLS, ROWS, lv.kinds, rnd);
         b.addCrates(lv.crates(), rnd);
         State s = new State();
@@ -165,9 +128,7 @@ public class Sim {
                     }
                 }
             }
-            counting = true;
             play(b, s, pick, true);
-            counting = false;
         }
     }
 
@@ -180,16 +141,6 @@ public class Sim {
     }
 
     public static void main(String[] args) {
-        if (args.length > 1 && args[1].equals("stats")) {
-            int games = Integer.parseInt(args[0]);
-            System.out.println("level  moves  power-ups made by player move / by cascade / used   (per game, expert bot)");
-            for (int i = 0; i < Level.COUNT; i++) {
-                madeByMove = madeByCascade = activated = 0;
-                for (int g = 0; g < games; g++) playLevel(Level.get(i), 1.0);
-                System.out.printf("%5d  %5d  %6.2f / %6.2f / %6.2f%n", i + 1, Level.get(i).moves, (double) madeByMove / games, (double) madeByCascade / games, (double) activated / games);
-            }
-            return;
-        }
         if (args.length > 1 && args[1].equals("tune")) {
             int games = Integer.parseInt(args[0]);
             StringBuilder sm = new StringBuilder();

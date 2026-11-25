@@ -1,6 +1,6 @@
 package com.zigzag.cottagekitchen;
 
-/** Artwork indexed by tile type id. Ids below CROPS are matchable crops; the rest are power-up tiles. */
+/** Artwork indexed by tile type id. Ids below CROPS are matchable crops; the rest are obstacles. */
 final class Art {
     static final int[] RES = {
             R.drawable.crop_corn,
@@ -18,36 +18,16 @@ final class Art {
             R.drawable.crop_milk,
             R.drawable.crop_sugar,
             R.drawable.crop_water,
-            R.drawable.crop_scarecrow,
-            R.drawable.crop_tnt,
-            R.drawable.crop_egg_gold,
-            R.drawable.crop_tractor,
             R.drawable.crop_crate,
             R.drawable.crop_crate_cracked,
     };
     static final int CROPS = 15;
-    static final int SCARECROW = 15, TNT = 16, GOLDEN_EGG = 17, TRACTOR = 18;
     /** A crate is an obstacle: it is not swapped or matched, and breaks after CRATE_HP hits from clears beside it. CRATE_CRACKED is only its second picture. */
-    static final int CRATE = 19, CRATE_CRACKED = 20, CRATE_HP = 2;
+    static final int CRATE = 15, CRATE_CRACKED = 16, CRATE_HP = 2;
     static final int COUNT = RES.length;
-
-    /** Power-up tiles (not crates). */
-    static boolean isSpecial(int type) {
-        return type >= CROPS && type < CRATE;
-    }
 
     static boolean isCrate(int type) {
         return type == CRATE;
-    }
-
-    /** Bombs clear the 3x3 area around them. */
-    static boolean isBomb(int type) {
-        return type == SCARECROW || type == TNT;
-    }
-
-    /** Colour-clearers remove every tile of the crop they are swapped with. */
-    static boolean isColor(int type) {
-        return type == GOLDEN_EGG || type == TRACTOR;
     }
 
     private Art() {

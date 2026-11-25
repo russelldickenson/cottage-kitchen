@@ -143,16 +143,6 @@ final class Gfx {
         circle(c, cx, cy + r * 0.38f, r * 0.14f, 0xFFD0D0D0);
     }
 
-    /** Glowing beam with a bright core. */
-    void beam(Canvas c, float x1, float y1, float x2, float y2, float w, int color) {
-        line.setColor(color);
-        line.setStrokeWidth(w);
-        c.drawLine(x1, y1, x2, y2, line);
-        line.setColor(0xCCFFFFFF);
-        line.setStrokeWidth(w * 0.35f);
-        c.drawLine(x1, y1, x2, y2, line);
-    }
-
     /** Speaker icon with sound waves, or a cross when muted. */
     void speaker(Canvas c, float cx, float cy, float r, boolean muted, int color) {
         fill.setColor(color);

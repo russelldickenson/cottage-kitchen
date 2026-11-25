@@ -13,7 +13,7 @@ final class Sfx {
 
     private final SoundPool pool;
     private final Vibrator vibrator;
-    private final int swap, bad, pop, coin, special, boom, magic, tractor, win, lose, click;
+    private final int swap, bad, pop, coin, win, lose, click;
     private long lastCoinMs;
 
     @SuppressWarnings("deprecation")
@@ -29,10 +29,6 @@ final class Sfx {
         bad = pool.load(ctx, R.raw.sfx_bad, 1);
         pop = pool.load(ctx, R.raw.sfx_pop, 1);
         coin = pool.load(ctx, R.raw.sfx_coin, 1);
-        special = pool.load(ctx, R.raw.sfx_special, 1);
-        boom = pool.load(ctx, R.raw.sfx_boom, 1);
-        magic = pool.load(ctx, R.raw.sfx_magic, 1);
-        tractor = pool.load(ctx, R.raw.sfx_tractor, 1);
         win = pool.load(ctx, R.raw.sfx_win, 1);
         lose = pool.load(ctx, R.raw.sfx_lose, 1);
         click = pool.load(ctx, R.raw.sfx_click, 1);
@@ -80,28 +76,6 @@ final class Sfx {
         if (now - lastCoinMs < 40) return;
         lastCoinMs = now;
         play(coin, 0.55f, 0.85f + 0.7f * fill);
-    }
-
-    void powerUpMade() {
-        play(special, 0.8f, 1f);
-        haptic(25, 120);
-    }
-
-    void powerUpPlayed(int type) {
-        switch (type) {
-            case Art.GOLDEN_EGG:
-                play(magic, 0.9f, 1f);
-                haptic(35, 150);
-                break;
-            case Art.TRACTOR:
-                play(tractor, 0.9f, 1f);
-                haptic(60, 120);
-                break;
-            default:
-                play(boom, 1f, 1f);
-                haptic(45, 230);
-                break;
-        }
     }
 
     void win() {

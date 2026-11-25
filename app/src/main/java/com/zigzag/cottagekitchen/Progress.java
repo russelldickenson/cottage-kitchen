@@ -19,6 +19,8 @@ final class Progress {
         soundOn = prefs.getBoolean("sound", true);
         introSeen = prefs.getBoolean("intro", false);
         for (int t = Art.CROPS; t < Art.COUNT; t++) tipSeen[t] = prefs.getBoolean("tip_" + t, false);
+        // crates used to be tile 19; keep the tip dismissed for existing saves
+        tipSeen[Art.CRATE] |= prefs.getBoolean("tip_19", false);
         for (int i = 0; i < Level.COUNT; i++) {
             bestStars[i] = prefs.getInt("stars_" + i, 0);
             bestScore[i] = prefs.getInt("score_" + i, 0);

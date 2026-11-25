@@ -25,7 +25,7 @@ public class GameView extends View {
     static final int MAX_STEPS = 12;
 
     static final int ICON_NONE = 0, ICON_CHEF = 1, ICON_NEXT = 2, ICON_REPLAY = 3;
-    /** tipType value for the one-time "how to play" card, before any power-up tips. */
+    /** tipType value for the one-time "how to play" card, before the crate tip. */
     static final int TIP_INTRO = -1;
 
     enum Phase {IDLE, SWAP, SWAPBACK, CLEAR, FALL, DONE, TIP}
@@ -59,9 +59,6 @@ public class GameView extends View {
 
     final List<Button> buttons = new ArrayList<>();
     final List<Tile> dying = new ArrayList<>();
-    Rules.Spawns spawns = new Rules.Spawns();
-    Tile fxTile;
-    float clearDuration = CLEAR_TIME;
     float doneT, tipT;
     int pendingTip = -1, tipType;
     boolean pendingIntro;
@@ -474,11 +471,7 @@ public class GameView extends View {
             case SWAP:
                 if (moveTiles(dt, false)) {
                     List<Board.Run> runs = board.findRuns();
-                    if (Art.isSpecial(swapA.type) || Art.isSpecial(swapB.type)) {
-                        movesLeft--;
-                        combo = 1;
-                        activateSpecial(swapA, swapB);
-                    } else if (runs.isEmpty()) {
+                    if (runs.isEmpty()) {
                         board.swap(swapA.r, swapA.c, swapB.r, swapB.c);
                         sfx.badSwap();
                         phase = Phase.SWAPBACK;
@@ -508,7 +501,7 @@ public class GameView extends View {
                     float s = p < 0.3f ? 1f + 0.3f * (p / 0.3f) : 1.3f * (1f - (p - 0.3f) / 0.7f);
                     t.scale = Math.max(0f, s);
                 }
-                if (clearTimer >= clearDuration) finishClear();
+                if (clearTimer >= CLEAR_TIME) finishClear();
                 break;
             case FALL:
                 if (moveTiles(dt, true)) {
@@ -573,10 +566,7 @@ public class GameView extends View {
     private void startClear(List<Board.Run> runs) {
         phase = Phase.CLEAR;
         clearTimer = 0;
-        clearDuration = CLEAR_TIME;
-        fxTile = null;
         dying.clear();
-        spawns = level.powerUps() ? Rules.findSpawns(runs, swapA, swapB, rnd) : new Rules.Spawns();
         sfx.match(combo);
         swapA = swapB = null;
 
@@ -591,27 +581,23 @@ public class GameView extends View {
                         need[t.type]--;
                         renderer.cook.launch(t.type, cx(t), cy(t), rnd.nextFloat() * 0.12f);
                     }
-                    if (!spawns.tiles.contains(t)) {
-                        t.dying = true;
-                        t.dyDelay = 0;
-                        dying.add(t);
-                    }
+                    t.dying = true;
+                    t.dyDelay = 0;
+                    dying.add(t);
                 }
             }
             if (first && combo > 1) addPop("Combo x" + combo + "!", W / 2, by + cell * 1.2f, cell * 0.8f, 1.1f, 0xFFFFD43B);
             first = false;
         }
         score += seen.size() * 10 * combo;
-        breakCrates(seen, 0f);
-        if (!spawns.tiles.isEmpty()) addPop(spawns.types.get(0) == Art.GOLDEN_EGG || spawns.types.get(0) == Art.TRACTOR ? "Super Harvest!" : "Big Bang!",
-                W / 2, by + cell * 2.4f, cell * 0.85f, 1.2f, 0xFFFF9B26);
+        breakCrates(seen);
     }
 
     /** Clears next to a crate (or catching it) hit it: it cracks, then breaks and counts toward the level goal. */
-    private void breakCrates(java.util.Collection<Tile> cleared, float delay) {
+    private void breakCrates(java.util.Collection<Tile> cleared) {
         List<Tile> damaged = new ArrayList<>();
         for (Tile t : Rules.hitCrates(board, cleared, damaged)) {
-            t.dyDelay = delay;
+            t.dyDelay = 0;
             t.dying = true;
             dying.add(t);
             score += 50;
@@ -627,64 +613,9 @@ public class GameView extends View {
         fx.pop(text, x, y, size, life, color, W * 0.88f);
     }
 
-    /** One of the swapped tiles is a power-up: work out what it takes with it. */
-    private void activateSpecial(Tile a, Tile b) {
-        beginSpecialClear(Rules.specialClearSet(board, a, b), Rules.activator(a, b), null);
-    }
-
-    private void beginSpecialClear(Set<Tile> set, final Tile act, String banner) {
-        phase = Phase.CLEAR;
-        clearTimer = 0;
-        dying.clear();
-        spawns = new Rules.Spawns();
-        fxTile = act;
-        swapA = swapB = null;
-        // crates in the blast are hit like those beside it, not cleared outright
-        List<Tile> list = new ArrayList<>();
-        for (Tile t : set) if (!Art.isCrate(t.type)) list.add(t);
-        list.sort((x, y) -> Integer.compare(Math.abs(x.r - act.r) + Math.abs(x.c - act.c), Math.abs(y.r - act.r) + Math.abs(y.c - act.c)));
-        float maxDelay = 0;
-        for (int i = 0; i < list.size(); i++) {
-            Tile t = list.get(i);
-            float d;
-            if (act.type == Art.GOLDEN_EGG) d = 0.03f * i;
-            else if (act.type == Art.TRACTOR) d = 0.1f + 0.08f * t.c;
-            else d = 0.07f * Math.max(Math.abs(t.r - act.r), Math.abs(t.c - act.c));
-            t.dyDelay = d;
-            t.dying = true;
-            dying.add(t);
-            if (t.type < Art.CROPS) {
-                if (need[t.type] > 0) {
-                    need[t.type]--;
-                    renderer.cook.launch(t.type, cx(t), cy(t), d);
-                }
-            }
-            maxDelay = Math.max(maxDelay, d);
-        }
-        score += list.size() * 10 * combo;
-        breakCrates(set, maxDelay);
-        act.dyDelay = maxDelay;
-        sfx.powerUpPlayed(banner == null ? act.type : Art.TNT);
-        clearDuration = CLEAR_TIME + maxDelay;
-        String name = banner != null ? banner : act.type == Art.GOLDEN_EGG ? "Golden Harvest!" : act.type == Art.TRACTOR ? "Rainbow Roundup!"
-                : act.type == Art.TNT ? "Boom!" : "Scarecrow Sweep!";
-        addPop(name, W / 2, by + cell * 1.2f, cell * 0.85f, 1.3f, 0xFFFFD43B);
-    }
-
     private void finishClear() {
         for (Tile t : dying) board.g[t.r][t.c] = null;
         dying.clear();
-        fxTile = null;
-        for (int i = 0; i < spawns.tiles.size(); i++) {
-            Tile t = spawns.tiles.get(i);
-            t.type = spawns.types.get(i);
-            if (!progress.tipSeen[t.type] && pendingTip < 0) pendingTip = t.type;
-            sfx.powerUpMade();
-            t.scale = 0f;
-            fx.sparkle(cx(t), cy(t), u, cell);
-            fx.sparkle(cx(t), cy(t), u, cell);
-        }
-        spawns = new Rules.Spawns();
         board.collapse();
         phase = Phase.FALL;
     }

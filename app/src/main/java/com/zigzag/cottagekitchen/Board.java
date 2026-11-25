@@ -38,7 +38,7 @@ final class Board {
     int typeAt(int r, int c) {
         if (r < 0 || c < 0 || r >= rows || c >= cols) return -1;
         Tile t = g[r][c];
-        return t == null || Art.isSpecial(t.type) || Art.isCrate(t.type) ? -1 : t.type;
+        return t == null || Art.isCrate(t.type) ? -1 : t.type;
     }
 
     private boolean makes3(int r, int c, int t) {
@@ -95,7 +95,7 @@ final class Board {
                     do {
                         t = pick();
                     } while (makes3(r, c, t));
-                    if (!Art.isSpecial(g[r][c].type) && !Art.isCrate(g[r][c].type)) g[r][c].type = t;
+                    if (!Art.isCrate(g[r][c].type)) g[r][c].type = t;
                 }
             }
         } while (findMove() == null);
@@ -161,7 +161,6 @@ final class Board {
 
     private boolean swapMatches(int r1, int c1, int r2, int c2) {
         if (Art.isCrate(g[r1][c1].type) || Art.isCrate(g[r2][c2].type)) return false;
-        if (Art.isSpecial(g[r1][c1].type) || Art.isSpecial(g[r2][c2].type)) return true;
         swap(r1, c1, r2, c2);
         boolean ok = !findRuns().isEmpty();
         swap(r1, c1, r2, c2);
