@@ -33,7 +33,14 @@ final class Renderer {
     private final Effects fx;
     private final Bitmap[] art = new Bitmap[Art.COUNT];
     private final Paint bmp = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
-    private Bitmap backdrop;
+    /** The kitchen wallpaper behind the welcome screen, from kitchen_background.jpg. */
+    private Bitmap kitchenBackdrop;
+    /** The wallpaper behind every other screen, from background.jpg. */
+    private Bitmap appBackdrop;
+    private Bitmap kitchenBg;
+    private Bitmap appBg;
+    /** The chef's hat picture on the home-screen play button, from aa_chefs_hat.jpeg. */
+    private Bitmap chefHat;
     final CookRenderer cook;
     private final Rect src = new Rect();
     private final RectF dst = new RectF();
@@ -46,12 +53,38 @@ final class Renderer {
         BitmapFactory.Options o = new BitmapFactory.Options();
         o.inScaled = false;
         for (int i = 0; i < Art.COUNT; i++) art[i] = BitmapFactory.decodeResource(ctx.getResources(), Art.RES[i], o);
+        kitchenBg = BitmapFactory.decodeResource(ctx.getResources(), R.drawable.kitchen_background, o);
+        appBg = BitmapFactory.decodeResource(ctx.getResources(), R.drawable.background, o);
+        chefHat = BitmapFactory.decodeResource(ctx.getResources(), R.drawable.aa_chefs_hat, o);
     }
 
-    /** Redraws the kitchen backdrop for the new screen size. */
+    /** Redraws both backdrops for the new screen size. */
     void onSize(float W, float H) {
-        if (backdrop != null) backdrop.recycle();
-        backdrop = new Backdrop(gfx).build((int) W, (int) H);
+        if (kitchenBackdrop != null) kitchenBackdrop.recycle();
+        if (appBackdrop != null) appBackdrop.recycle();
+        kitchenBackdrop = buildBackdrop(kitchenBg, (int) W, (int) H);
+        appBackdrop = buildBackdrop(appBg, (int) W, (int) H);
+    }
+
+    /**
+     * Scales the given background to cover the screen, cropping the overflow evenly so the
+     * artwork keeps its proportions on any display.
+     */
+    private Bitmap buildBackdrop(Bitmap source, int w, int h) {
+        Bitmap out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(out);
+        if (source == null) {
+            c.drawColor(0xFFF6DEC0);
+        } else {
+            float sw = source.getWidth(), sh = source.getHeight();
+            float scale = Math.max(w / sw, h / sh);
+            float dw = sw * scale, dh = sh * scale;
+            float dx = (w - dw) / 2f, dy = (h - dh) / 2f;
+            Rect s = new Rect(0, 0, (int) sw, (int) sh);
+            RectF d = new RectF(dx, dy, dx + dw, dy + dh);
+            c.drawBitmap(source, s, d, bmp);
+        }
+        return out;
     }
 
     void draw(Canvas c) {
@@ -64,7 +97,9 @@ final class Renderer {
     }
 
     private void drawBackground(Canvas c) {
-        if (backdrop != null) c.drawBitmap(backdrop, 0, 0, null);
+        // the welcome screen keeps the kitchen scene; every other screen uses the plain wallpaper
+        Bitmap bg = v.screen == Screen.TITLE ? kitchenBackdrop : appBackdrop;
+        if (bg != null) c.drawBitmap(bg, 0, 0, null);
     }
 
     void drawIcon(Canvas c, int type, float cx, float cy, float size, float alpha) {
@@ -75,6 +110,14 @@ final class Renderer {
 
     void drawIcon(Canvas c, int type, float cx, float cy, float size) {
         Bitmap b = art[type];
+        src.set(0, 0, b.getWidth(), b.getHeight());
+        dst.set(cx - size / 2, cy - size / 2, cx + size / 2, cy + size / 2);
+        c.drawBitmap(b, src, dst, bmp);
+    }
+
+    /** Draws a bitmap centred on (cx, cy) in a square of the given size. */
+    void drawBitmapCentered(Canvas c, Bitmap b, float cx, float cy, float size) {
+        if (b == null) return;
         src.set(0, 0, b.getWidth(), b.getHeight());
         dst.set(cx - size / 2, cy - size / 2, cx + size / 2, cy + size / 2);
         c.drawBitmap(b, src, dst, bmp);
@@ -482,7 +525,14 @@ final class Renderer {
                 float tw = gfx.width(b.text, size), icon = (b.icon == GameView.ICON_CHEF ? 0.62f : b.icon == GameView.ICON_REPLAY ? 0.6f : 0.5f) * h, gap = h * 0.18f;
                 float x0 = cx - (icon + gap + tw) / 2, textX = b.icon == GameView.ICON_NEXT ? x0 : x0 + icon + gap;
                 float iconX = b.icon == GameView.ICON_NEXT ? x0 + tw + gap + icon / 2 : x0 + icon / 2;
-                if (b.icon == GameView.ICON_CHEF) gfx.chefHat(c, iconX, cy + off - h * 0.06f, icon);
+                if (b.icon == GameView.ICON_CHEF) {
+                    // the home-screen play button uses the chef's hat picture; other
+                    // screens keep the drawn hat so it matches the button artwork there
+                    if (v.screen == Screen.TITLE && chefHat != null)
+                        drawBitmapCentered(c, chefHat, iconX, cy + off - h * 0.06f, icon);
+                    else
+                        gfx.chefHat(c, iconX, cy + off - h * 0.06f, icon);
+                }
                 else if (b.icon == GameView.ICON_NEXT) gfx.nextArrow(c, iconX, cy + off, icon, outline);
                 else gfx.replayArrow(c, iconX, cy + off, icon, outline);
                 gfx.textC(c, b.text, textX, cy + off, size, Color.WHITE, outline, Paint.Align.LEFT);

@@ -239,7 +239,7 @@ final class CookRenderer {
         Recipes.Recipe rc = Recipes.ALL[v.recipe];
         float m = 3 * v.u, u = v.u;
         boolean cooked = v.progress.recipeDone(v.recipe);
-        gfx.textC(c, rc.name, v.W / 2, v.topInset + m + 6.5f * u,
+        gfx.textC(c, rc.name, v.W / 2, v.topInset + m + 6.5f * u + v.recipeShift,
                 fitSize(rc.name, 7.5f * u, v.W - 40 * u), Color.WHITE, 0xFF1F5F10, Paint.Align.CENTER);
 
         RectF hero = v.recipeDish;

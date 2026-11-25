@@ -69,6 +69,8 @@ public class GameView extends View {
     // layout
     float W, H, topInset, botInset, u;
     float bx, by, cell;
+    /** Extra top offset on the recipe screen, so the dish and its caption clear the bunting. */
+    float recipeShift;
     /** The order card under the board: the dish and what it still needs. */
     final RectF kitchen = new RectF();
     final RectF boardPanel = new RectF(), tipBox = new RectF(), confirmBox = new RectF(), resultBox = new RectF();
@@ -158,7 +160,9 @@ public class GameView extends View {
     /** Lays out the recipe screen: a dish hero and the dish's ingredient steps in wrapped rows. */
     private void layoutRecipe() {
         float m = 3 * u, hh = 13 * u;
-        float panelT = topInset + m + hh + 3 * u;
+        // nudge the dish, its name and the ingredient count below the bunting across the top
+        recipeShift = 10 * u;
+        float panelT = topInset + m + hh + 3 * u + recipeShift;
         float panelB = H - botInset - m - 16 * u;
         float availW = W - 2 * m, ph = Math.max(10 * u, panelB - panelT);
         float dishSize = Math.min(availW * 0.42f, ph * 0.34f);
@@ -200,7 +204,7 @@ public class GameView extends View {
             });
         } else if (screen == Screen.TITLE) {
             addSpeaker(m, topInset + m, hh);
-            addWide(W / 2, H * 0.66f, W * 0.6f, 17 * u, "COOK", GREEN, this::goBook).icon = ICON_CHEF;
+            addWide(W / 2, H * 0.66f, W * 0.6f, 17 * u, "Let's cook", GREEN, this::goBook).icon = ICON_CHEF;
         } else if (screen == Screen.RESULT) {
             addBack(m, topInset + m, hh, this::goBook);
             buildResultButtons();
@@ -231,7 +235,7 @@ public class GameView extends View {
                 b.recipeStep = step;
             }
             boolean cooked = progress.recipeDone(recipe);
-            String label = cooked ? "COOK AGAIN" : next > 0 ? "NEXT INGREDIENT" : "START COOKING";
+            String label = cooked ? "COOK AGAIN" : next > 0 ? "Next" : "START COOKING";
             Button b = addWide(W / 2, H - botInset - m - 8 * u, W * 0.6f, 13 * u, label, GREEN,
                     () -> startLevel(Recipes.firstLevel(recipe) + (cooked ? 0 : next)));
             b.icon = cooked ? ICON_REPLAY : next > 0 ? ICON_NEXT : ICON_CHEF;
