@@ -90,6 +90,8 @@ public class GameView extends View {
     Board board;
     int[] need = new int[Art.COUNT];
     int movesLeft, combo, stars, score;
+    /** The first five-in-a-row or L/T clear in a level refunds one move. */
+    boolean batchBonusUsed;
     boolean recordScore;
     boolean won;
     float idleTime, clearTimer, time;
@@ -416,6 +418,7 @@ public class GameView extends View {
         movesLeft = level.moves;
         combo = 0;
         score = 0;
+        batchBonusUsed = false;
         recordScore = false;
         introT = 0;
         selected = null;
@@ -568,6 +571,12 @@ public class GameView extends View {
         clearTimer = 0;
         dying.clear();
         sfx.match(combo);
+        if (!batchBonusUsed && Rules.bigMatch(runs)) {
+            batchBonusUsed = true;
+            movesLeft++;
+            sfx.coin();
+            addPop("Batch cooked! +1 move", W / 2, by + cell * 2.4f, cell * 0.8f, 1.2f, 0xFFFFD43B);
+        }
         swapA = swapB = null;
 
         Set<Tile> seen = new HashSet<>();

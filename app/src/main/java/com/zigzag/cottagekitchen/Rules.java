@@ -9,6 +9,19 @@ import java.util.Set;
 final class Rules {
     static final int COLS = 7, ROWS = 8;
 
+    /** A batch-worthy clear: five or more in a row, or a horizontal and vertical run meeting in an L/T. */
+    static boolean bigMatch(List<Board.Run> runs) {
+        for (Board.Run run : runs) if (run.tiles.size() >= 5) return true;
+        for (Board.Run h : runs) {
+            if (!h.horizontal) continue;
+            for (Board.Run v : runs) {
+                if (v.horizontal || v.type != h.type) continue;
+                for (Tile t : h.tiles) if (v.tiles.contains(t)) return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Crates next to a cleared tile, or caught in the clear themselves, lose one hit each (once per clear).
      * Returns the crates that broke; those that only cracked go into damaged.

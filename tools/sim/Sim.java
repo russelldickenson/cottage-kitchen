@@ -14,11 +14,13 @@ public class Sim {
     static final class State {
         int[] need = new int[Art.COUNT];
         int moves;
+        boolean batchBonus;
 
         State copy() {
             State s = new State();
             s.need = need.clone();
             s.moves = moves;
+            s.batchBonus = batchBonus;
             return s;
         }
 
@@ -72,6 +74,11 @@ public class Sim {
         double gain = 0;
         Set<Tile> counted = new LinkedHashSet<>();
         while (true) {
+            if (!s.batchBonus && Rules.bigMatch(runs)) {
+                s.batchBonus = true;
+                s.moves++;
+                gain += 2;
+            }
             for (Board.Run run : runs) counted.addAll(run.tiles);
             Set<Tile> clear = new LinkedHashSet<>(counted);
             List<Tile> damaged = new ArrayList<>();

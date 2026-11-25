@@ -24,6 +24,7 @@ Every dish is cooked one ingredient at a time. Progress shows up right on its re
 
 - Swap adjacent tiles on the 7 × 8 board — tap two neighbours or drag one onto the other. Invalid swaps bounce back.
 - Match three or more in a row to collect that ingredient for the current order. Cascades build combos and multiply the score.
+- Match five in a row or make an L/T shape for a batch-cooking bonus: one extra move, once per level.
 - Collect everything on the order before the moves run out. There is no timer: only the move budget puts on the pressure.
 - Finish with moves to spare for one to three stars. Stars unlock the next level and, along with your best score, are saved on the device.
 - From level 20, some orders include crates. They cannot be swapped; clear tiles beside them twice to break them.
