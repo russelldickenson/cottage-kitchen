@@ -1,12 +1,14 @@
-<p align="center">
-  <img src="./assets/readme/screenshot.png" width="360" alt="Cottage Kitchen gameplay: a 7 by 8 board of smiling ingredients with a Strawberry Jam order card below">
-</p>
-
 # Cottage Kitchen
 
 A cosy cooking match-3 game for Android. Swap ingredients, harvest what a recipe asks for, and fill the order before you run out of moves. Fourteen dishes, 49 levels, and a recipe book that fills in as you cook.
 
 No account, no ads, no network access — just a board, a wooden spoon, and a very hungry cottage.
+
+<p align="center">
+  <img src="./assets/readme/screenshot.png" width="440" alt="Cottage Kitchen gameplay: a 7 by 8 board of smiling ingredients with a Strawberry Jam order card below">
+</p>
+
+<p align="center"><em>First order: harvest 10 strawberries in 11 moves.</em></p>
 
 ## The dishes
 
