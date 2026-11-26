@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/readme/hero.svg" width="100%" alt="Cottage Kitchen — a cozy cooking match-3 game for Android. The title sits beside a board of smiling ingredient tiles with three berries lined up to be harvested.">
+  <img src="./assets/readme/screenshot.png" width="360" alt="Cottage Kitchen gameplay: a 7 by 8 board of smiling ingredients with a Strawberry Jam order card below">
 </p>
 
 # Cottage Kitchen
