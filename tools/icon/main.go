@@ -1,5 +1,5 @@
 // icon builds the launcher icon files from the source artwork
-// _aa_cottage_with_hat.jpeg (a cottage in the same cartoon style as the game).
+// _cottage_kitchen.jpeg (a cottage in the same cartoon style as the game).
 //
 // The artwork is drawn centred on a plain background sampled from its own edges,
 // leaving a border all round. Launchers on API 26+ apply their own shape mask and
@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 )
 
-const source = "../../_aa_cottage_with_hat.jpeg"
+const source = "../../_cottage_kitchen.jpeg"
 
 // Fraction of the canvas the artwork fills. The rest is the plain border.
 // Adaptive icons keep the cottage inside the central safe zone so any launcher
