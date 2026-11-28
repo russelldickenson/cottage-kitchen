@@ -26,10 +26,12 @@ const source = "../../_cottage_kitchen.jpeg"
 // Fraction of the canvas the artwork fills. The rest is the plain border.
 // Adaptive icons keep the cottage inside the central safe zone so any launcher
 // mask shape (circle, squircle, ...) leaves the drawing intact.
+// Increased fill so the image occupies almost all space with only the pale
+// background colour visible around the edges.
 const (
-	legacyFill    = 0.80
-	adaptiveFill  = 0.66
-	playstoreFill = 0.80
+	legacyFill    = 0.90
+	adaptiveFill  = 0.90
+	playstoreFill = 0.90
 )
 
 // load decodes a PNG or JPEG into an NRGBA image.
